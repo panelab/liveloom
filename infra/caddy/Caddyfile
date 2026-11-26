@@ -1,0 +1,24 @@
+# HTTPS is automatic: Caddy gets and renews a Let's Encrypt certificate for
+# $DOMAIN, as long as DNS points here and ports 80/443 are open.
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	# Merged chat stream (OBS plugin, overlays, dashboard) → relay.
+	# Not compressed: compression would buffer the live event stream.
+	handle /chat/* {
+		reverse_proxy relay:8787 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy web:3000
+	}
+}

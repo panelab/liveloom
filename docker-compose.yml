@@ -1,0 +1,76 @@
+# VPS deployment: everything on one box.
+#   cp .env.example .env   # fill in secrets, DOMAIN, NUXT_PUBLIC_INGEST_URL
+#   docker compose up -d --build
+# Caddy serves https://$DOMAIN (auto Let's Encrypt). Needs DNS A record → this
+# machine and ports 80, 443 (tcp+udp), 1935/tcp, 8890/udp open.
+#
+# Using Turso cloud instead of the bundled libSQL server? Set DATABASE_URL /
+# DATABASE_AUTH_TOKEN in .env and run: docker compose up -d --build mediamtx relay web
+# Dashboard on Cloudflare instead? Leave out `web`: docker compose up -d mediamtx relay
+
+x-db-env: &db-env
+  DATABASE_URL: ${DATABASE_URL_DOCKER:-http://libsql:8080}
+  DATABASE_AUTH_TOKEN: ${DATABASE_AUTH_TOKEN:-}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
+
+services:
+  libsql:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    volumes:
+      - libsql-data:/var/lib/sqld
+    restart: unless-stopped
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.4
+    ports:
+      - "1935:1935"      # RTMP ingest (OBS)
+      - "8890:8890/udp"  # SRT ingest
+    volumes:
+      - ./infra/mediamtx.yml:/mediamtx.yml:ro
+    environment:
+      MTX_AUTHHTTPADDRESS: http://relay:8787/mediamtx/auth
+    restart: unless-stopped
+
+  relay:
+    build: { context: ., dockerfile: apps/relay/Dockerfile }
+    environment:
+      <<: *db-env
+      RELAY_SECRET: ${RELAY_SECRET:?set RELAY_SECRET in .env}
+      HOST: 0.0.0.0
+      MEDIAMTX_API_URL: http://mediamtx:9997
+      MEDIAMTX_RTMP_URL: rtmp://mediamtx:1935
+    depends_on: [mediamtx]
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    # Not public: only Caddy (and the host, for debugging) can reach it.
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      <<: *db-env
+      NUXT_APP_SECRET: ${NUXT_APP_SECRET:?set NUXT_APP_SECRET in .env}
+      NUXT_PUBLIC_INGEST_URL: ${NUXT_PUBLIC_INGEST_URL:-rtmp://localhost:1935/live}
+      PORT: 3000
+    depends_on: [relay]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web]
+    restart: unless-stopped
+
+volumes:
+  libsql-data:
+  caddy-data:
+  caddy-config:

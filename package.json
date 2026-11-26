@@ -1,0 +1,21 @@
+{
+  "name": "streaming-platform",
+  "private": true,
+  "packageManager": "bun@1.4.5",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:db": "turso dev --db-file data/dev.db --port 8080",
+    "dev:media": "docker compose -f infra/docker-compose.dev.yml up",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "bun --cwd packages/db run generate",
+    "db:migrate": "bun --cwd packages/db run migrate",
+    "db:studio": "npx -y strokedb@0.4.0 ./data/dev.db",
+    "db:studio:share": "npx -y strokedb@0.4.0 ./data/dev.db --share --no-open"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.13",
+    "typescript": "^5.9.3"
+  }
+}

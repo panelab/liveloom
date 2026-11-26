@@ -1,0 +1,9 @@
+# Local dev: only MediaMTX runs in Docker (host network so it can reach the
+# relay on 127.0.0.1:8787). libSQL: `bun dev:db`, apps: `bun dev`.
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.4
+    network_mode: host
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped

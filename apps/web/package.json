@@ -1,0 +1,30 @@
+{
+  "name": "@sp/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --dotenv ../../.env",
+    "build": "nuxt build",
+    "build:cf": "NITRO_PRESET=cloudflare_module nuxt build",
+    "deploy:cf": "bun run build:cf && wrangler deploy",
+    "start": "bun .output/server/index.mjs",
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.0",
+    "@iconify-json/simple-icons": "^1.2.0",
+    "@nuxt/ui": "^4.13.1",
+    "@sp/db": "workspace:*",
+    "@sp/shared": "workspace:*",
+    "nuxt": "^4.7.0",
+    "nuxt-auth-utils": "^0.6.2",
+    "tailwindcss": "^4.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.14",
+    "wrangler": "^4.168.0"
+  }
+}

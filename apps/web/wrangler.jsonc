@@ -1,0 +1,16 @@
+// Cloudflare Workers deploy for the dashboard (the relay stays on a VPS).
+// 1. bunx wrangler secret put DATABASE_URL         (libsql://… Turso URL)
+// 2. bunx wrangler secret put DATABASE_AUTH_TOKEN
+// 3. bunx wrangler secret put ENCRYPTION_KEY       (same as the relay!)
+// 4. bunx wrangler secret put NUXT_APP_SECRET
+// 5. bun run deploy:cf   (Nitro fills in main/assets at build time)
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "streaming-platform-web",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NUXT_PUBLIC_INGEST_URL": "rtmp://your-vps-host:1935/live"
+  },
+  "observability": { "enabled": true }
+}

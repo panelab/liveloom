@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/multichat">
+    <file alias="twitch.png">icons/twitch.png</file>
+    <file alias="kick.png">icons/kick.png</file>
+    <file alias="youtube.png">icons/youtube.png</file>
+  </qresource>
+</RCC>

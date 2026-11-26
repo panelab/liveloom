@@ -1,0 +1,103 @@
+# Builds the Multichat OBS plugin for Windows, macOS and Ubuntu using the
+# obs-plugintemplate build scripts in plugins/obs-multichat/.github/scripts.
+# Push a tag like `obs-multichat-v0.1.0` to publish a GitHub Release.
+name: OBS plugin
+
+on:
+  push:
+    branches: [main]
+    paths: ['plugins/obs-multichat/**', '.github/workflows/obs-plugin.yaml']
+    tags: ['obs-multichat-v*']
+  pull_request:
+    paths: ['plugins/obs-multichat/**', '.github/workflows/obs-plugin.yaml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN_DIR: plugins/obs-multichat
+  CONFIG: RelWithDebInfo
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: plugins/obs-multichat
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: .github/scripts/Build-Windows.ps1 -Target x64 -Configuration $env:CONFIG
+      - name: Package
+        run: .github/scripts/Package-Windows.ps1 -Target x64 -Configuration $env:CONFIG
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obs-multichat-windows-x64
+          path: ${{ env.PLUGIN_DIR }}/release/*.zip
+
+  macos:
+    name: macOS universal
+    runs-on: macos-15
+    defaults:
+      run:
+        shell: zsh --no-rcs --errexit --pipefail {0}
+        working-directory: plugins/obs-multichat
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.1.0.app/Contents/Developer
+      - name: Build
+        env:
+          CODESIGN_IDENT: '-'
+        run: .github/scripts/build-macos --config ${CONFIG}
+      - name: Package
+        env:
+          CODESIGN_IDENT: '-'
+        run: .github/scripts/package-macos --config ${CONFIG} --package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obs-multichat-macos-universal
+          path: |
+            ${{ env.PLUGIN_DIR }}/release/*.pkg
+            ${{ env.PLUGIN_DIR }}/release/*.tar.xz
+
+  ubuntu:
+    name: Ubuntu 24.04 x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zsh
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          echo "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin" >> $GITHUB_PATH
+          brew install --quiet zsh
+      - name: Build
+        shell: zsh --no-rcs --errexit --pipefail {0}
+        working-directory: plugins/obs-multichat
+        run: .github/scripts/build-ubuntu --target ubuntu-x86_64 --config ${CONFIG}
+      - name: Package
+        shell: zsh --no-rcs --errexit --pipefail {0}
+        working-directory: plugins/obs-multichat
+        run: .github/scripts/package-ubuntu --target ubuntu-x86_64 --config ${CONFIG} --package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obs-multichat-ubuntu-x86_64
+          path: ${{ env.PLUGIN_DIR }}/release/*.deb
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/obs-multichat-v')
+    needs: [windows, macos, ubuntu]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

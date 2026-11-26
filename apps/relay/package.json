@@ -1,0 +1,15 @@
+{
+  "name": "@sp/relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sp/db": "workspace:*",
+    "@sp/shared": "workspace:*"
+  },
+  "devDependencies": { "@types/bun": "^1.4.5" }
+}

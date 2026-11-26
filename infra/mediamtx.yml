@@ -1,0 +1,33 @@
+# MediaMTX: receives the streamer's single upload.
+# OBS → rtmp://<host>:1935/live/<ingest key>     (or SRT on :8890)
+# Every connection is checked by the relay's /mediamtx/auth hook:
+#   publish → ingest key must exist in the DB
+#   read/api → only the relay (user "relay" + RELAY_SECRET)
+
+logLevel: info
+
+authMethod: http
+# Overridden in docker-compose via MTX_AUTHHTTPADDRESS
+authHTTPAddress: http://127.0.0.1:8787/mediamtx/auth
+authHTTPExclude: []
+
+api: yes
+apiAddress: :9997
+
+rtmp: yes
+rtmpAddress: :1935
+
+srt: yes
+srtAddress: :8890
+
+rtsp: no
+hls: no
+webrtc: no
+moq: no
+
+pathDefaults:
+  # Drop the publisher if no data for a while (dead OBS connection)
+  sourceOnDemand: no
+
+paths:
+  all_others:
