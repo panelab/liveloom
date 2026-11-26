@@ -44,10 +44,9 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
       <UDashboardNavbar title="Chat">
         <template #trailing>
           <UiStatus
-            :tone="connected ? 'live' : 'info'"
-            :pulse="!connected"
-            :label="connected ? `${configured.length} source${configured.length === 1 ? '' : 's'}` : 'Connecting…'"
-            class="text-muted"
+            :tone="!configured.length ? 'off' : connected ? 'live' : 'info'"
+            :pulse="false"
+            :label="!configured.length ? 'No sources' : connected ? `${configured.length} source${configured.length === 1 ? '' : 's'}` : 'Connecting…'"
           />
         </template>
         <template #right>
@@ -109,10 +108,12 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
       <UDashboardNavbar title="Sources" :toggle="false" />
     </template>
     <template #body>
+      <div class="space-y-6">
       <ChatSourcesForm :sources="sources" />
       <UiCallout tone="info" icon="i-lucide-puzzle" title="Show chat in OBS" description="Install the Multichat plugin and sign in. Chat appears in a dock and as a scene source.">
         <UButton label="Set up the plugin" to="/setup" variant="link" color="neutral" size="xs" class="mt-1 px-0" trailing-icon="i-lucide-arrow-right" />
       </UiCallout>
+      </div>
     </template>
   </UDashboardPanel>
 

@@ -71,7 +71,7 @@ const manualOpen = ref(false)
           <li class="flex gap-4 border-b border-muted p-5">
             <span
               class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold"
-              :class="signedIn ? 'bg-primary text-white' : 'border border-accented text-muted'"
+              :class="signedIn ? 'bg-primary text-(--accent-fg)' : 'border border-accented text-muted'"
             >
               <UIcon v-if="signedIn" name="i-lucide-check" class="size-3.5" /><template v-else>2</template>
             </span>
@@ -90,7 +90,7 @@ const manualOpen = ref(false)
           <li class="flex gap-4 p-5">
             <span
               class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold"
-              :class="dash.isLive.value ? 'bg-primary text-white' : 'border border-accented text-muted'"
+              :class="dash.isLive.value ? 'bg-primary text-(--accent-fg)' : 'border border-accented text-muted'"
             >
               <UIcon v-if="dash.isLive.value" name="i-lucide-check" class="size-3.5" /><template v-else>3</template>
             </span>

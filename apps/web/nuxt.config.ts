@@ -9,7 +9,10 @@ export default defineNuxtConfig({
   colorMode: { preference: 'dark', fallback: 'dark' },
   fonts: { families: [{ name: 'Inter', provider: 'google' }, { name: 'JetBrains Mono', provider: 'google' }] },
   app: {
-    head: { title: 'LiveLoom', link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }] },
+    head: {
+      title: 'LiveLoom',
+      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }],
+    },
   },
   runtimeConfig: {
     // Server-only. Override at runtime with NUXT_DATABASE_URL etc., or the

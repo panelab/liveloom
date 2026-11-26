@@ -10,7 +10,7 @@ const current = computed(() => props.steps.findIndex((s) => !s.done))
     <li v-for="(s, i) in steps" :key="s.title" class="flex items-center gap-3 px-4 py-3 not-last:border-b not-last:border-muted">
       <span
         class="grid size-5 shrink-0 place-items-center rounded-full text-2xs font-semibold"
-        :class="s.done ? 'bg-primary text-white' : i === current ? 'border border-primary text-primary' : 'border border-accented text-dimmed'"
+        :class="s.done ? 'bg-primary text-(--accent-fg)' : i === current ? 'border border-primary text-primary' : 'border border-accented text-dimmed'"
       >
         <UIcon v-if="s.done" name="i-lucide-check" class="size-3" />
         <template v-else>{{ i + 1 }}</template>

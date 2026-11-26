@@ -44,7 +44,7 @@ export const PROVIDERS: Record<ConnectPlatform, Provider> = {
     name: 'Twitch',
     authorizeUrl: 'https://id.twitch.tv/oauth2/authorize',
     tokenUrl: 'https://id.twitch.tv/oauth2/token',
-    scopes: ['channel:read:stream_key'],
+    scopes: ['channel:read:stream_key', 'channel:manage:broadcast'],
     pkce: false,
     async fetchAccount(token, clientId) {
       const h = { authorization: `Bearer ${token}`, 'client-id': clientId }
@@ -62,7 +62,7 @@ export const PROVIDERS: Record<ConnectPlatform, Provider> = {
     name: 'Kick',
     authorizeUrl: 'https://id.kick.com/oauth/authorize',
     tokenUrl: 'https://id.kick.com/oauth/token',
-    scopes: ['user:read', 'channel:read', 'streamkey:read'],
+    scopes: ['user:read', 'channel:read', 'channel:write', 'streamkey:read'],
     pkce: true,
     async fetchAccount(token) {
       const h = { authorization: `Bearer ${token}` }
@@ -78,7 +78,8 @@ export const PROVIDERS: Record<ConnectPlatform, Provider> = {
     name: 'YouTube',
     authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+    // Full "youtube" scope: read the stream key and update the live video's title/description.
+    scopes: ['https://www.googleapis.com/auth/youtube'],
     pkce: true,
     extraAuthParams: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' },
     async fetchAccount(token) {

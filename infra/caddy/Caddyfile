@@ -9,6 +9,11 @@
 		-Server
 	}
 
+	# Relay → web only (also secret-protected); never from the internet.
+	handle /api/internal/* {
+		respond 404
+	}
+
 	# Merged chat stream (OBS plugin, overlays, dashboard) → relay.
 	# Not compressed: compression would buffer the live event stream.
 	handle /chat/* {

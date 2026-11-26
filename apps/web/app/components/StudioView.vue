@@ -285,6 +285,8 @@ defineShortcuts({
             </ul>
           </section>
 
+          <StreamDetails compact />
+
           <section v-if="bubble" class="space-y-3">
             <h3 class="label-caps">Camera</h3>
             <div class="flex items-center gap-2">

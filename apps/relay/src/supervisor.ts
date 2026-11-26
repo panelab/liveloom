@@ -111,6 +111,8 @@ export class Supervisor {
     if (newlyLive.length) {
       await this.db.update(channels).set({ isLive: true, liveSince: now, updatedAt: now }).where(inArray(channels.id, newlyLive))
       console.log(`[supervisor] live: ${newlyLive.length} channel(s)`)
+      // Push the saved title/description now and again later (YouTube creates its live video a bit after ingest starts).
+      for (const id of newlyLive) for (const ms of [15_000, 75_000]) setTimeout(() => void this.applyStreamInfo(id), ms)
     }
     for (const c of liveChannels) if (!this.probes.has(c.id)) this.probes.set(c.id, Date.now() + PROBE_FIRST_MS)
     for (const id of [...this.probes.keys()]) {
@@ -254,6 +256,20 @@ export class Supervisor {
       console.error('[health]', e instanceof Error ? e.message : e)
     } finally {
       this.probing.delete(channelId)
+    }
+  }
+
+  private async applyStreamInfo(channelId: string) {
+    try {
+      const res = await fetch(`${config.webInternalUrl}/api/internal/stream-info`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-relay-secret': config.relaySecret },
+        body: JSON.stringify({ channelId }),
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (!res.ok) console.warn(`[stream-info] ${res.status} ${(await res.text()).slice(0, 160)}`)
+    } catch (e) {
+      console.warn('[stream-info]', e instanceof Error ? e.message : e)
     }
   }
 

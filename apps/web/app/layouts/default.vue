@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const { user, clear } = useUserSession()
-const dash = useDashboardPolling()
+const dash = await useDashboardPolling()
 const colorMode = useColorMode()
 const route = useRoute()
 const dialog = useDestinationDialog()

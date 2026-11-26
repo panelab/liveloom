@@ -20,9 +20,13 @@ export function useDashboard() {
   const now = useState('dash-now', () => Date.now())
   const pending = useState('dash-pending', () => true)
 
+  // useRequestFetch forwards the session cookie during server rendering.
+  const fetcher = useRequestFetch()
   async function refresh() {
     try {
-      data.value = await $fetch('/api/destinations') as any
+      data.value = await fetcher('/api/destinations') as any
+    } catch {
+      // keep the last known state (e.g. a blip while the server restarts)
     } finally {
       pending.value = false
     }
@@ -42,18 +46,25 @@ export function useDashboard() {
   return { data, now, pending, refresh, destinations, isLive, liveSince, enabled, streaming, totalKbps, uptime, health, issues }
 }
 
-/** Call once (in the layout) to start polling. */
-export function useDashboardPolling() {
+/**
+ * Call once (in the layout). Like a Remix loader: the live state is fetched on
+ * the server before the first render, so the page never flashes "Offline" and
+ * then jumps to "Live". The browser then keeps it fresh every 2 s.
+ */
+export async function useDashboardPolling() {
   const dash = useDashboard()
   let timer: ReturnType<typeof setInterval> | undefined
+  // Lifecycle hooks must be registered before the first await.
   onMounted(() => {
-    dash.refresh()
+    dash.now.value = Date.now()
+    if (dash.data.value === null) dash.refresh()
     timer = setInterval(() => {
       dash.now.value = Date.now()
       if (document.visibilityState === 'visible') dash.refresh()
     }, 2000)
   })
   onBeforeUnmount(() => clearInterval(timer))
+  if (import.meta.server && dash.data.value === null) await dash.refresh()
   return dash
 }
 
@@ -143,4 +154,9 @@ export function useDestinationActions() {
     ].filter((g) => g.length)
   }
   return { toggle, remove, refreshKey, disconnect, menu }
+}
+
+/** Accent color, stored in a cookie so the server renders it (no flash of the default color). */
+export function useAccent() {
+  return useCookie<string>('liveloom-accent', { default: () => 'blue', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' })
 }

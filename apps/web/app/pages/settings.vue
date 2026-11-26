@@ -30,6 +30,19 @@ const themes = [
   { label: 'Light', value: 'light', icon: 'i-lucide-sun' },
   { label: 'System', value: 'system', icon: 'i-lucide-monitor' },
 ]
+const accents = [
+  { id: 'blue', label: 'Blue', color: 'oklch(0.64 0.19 255)' },
+  { id: 'violet', label: 'Violet', color: 'oklch(0.64 0.19 292)' },
+  { id: 'pink', label: 'Pink', color: 'oklch(0.66 0.2 354)' },
+  { id: 'orange', label: 'Orange', color: 'oklch(0.68 0.19 42)' },
+  { id: 'amber', label: 'Amber', color: 'oklch(0.82 0.16 78)' },
+  { id: 'mint', label: 'Mint', color: 'oklch(0.8 0.13 168)' },
+  { id: 'mono', label: 'Mono', color: 'var(--ui-text-highlighted)' },
+]
+const accent = useAccent()
+function setAccent(id: string) {
+  accent.value = id
+}
 const shortcuts = [
   { keys: ['meta', 'K'], label: 'Search and commands' },
   { keys: ['/'], label: 'Search and commands' },
@@ -98,6 +111,21 @@ const shortcuts = [
         </UiPanel>
 
         <UiPanel title="Appearance" plain>
+          <div class="space-y-4">
+          <div class="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Accent color">
+            <UTooltip v-for="a in accents" :key="a.id" :text="a.label">
+              <button
+                type="button"
+                role="radio"
+                :aria-checked="accent === a.id"
+                :aria-label="a.label"
+                class="grid size-7 place-items-center rounded-full ring-offset-2 ring-offset-(--ui-bg) transition-shadow"
+                :class="accent === a.id ? 'ring-2 ring-(--ui-text-highlighted)' : 'ring-1 ring-(--ui-border)'"
+                :style="{ background: a.color }"
+                @click="setAccent(a.id)"
+              />
+            </UTooltip>
+          </div>
           <UFieldGroup>
             <UButton
               v-for="t in themes"
@@ -109,6 +137,7 @@ const shortcuts = [
               @click="colorMode.preference = t.value"
             />
           </UFieldGroup>
+          </div>
         </UiPanel>
 
         <UiPanel id="shortcuts" title="Keyboard shortcuts" flush>

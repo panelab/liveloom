@@ -40,6 +40,7 @@ services:
     environment:
       <<: *db-env
       RELAY_SECRET: ${RELAY_SECRET:?set RELAY_SECRET in .env}
+      WEB_INTERNAL_URL: http://web:3000
       HOST: 0.0.0.0
       MEDIAMTX_API_URL: http://mediamtx:9997
       MEDIAMTX_RTMP_URL: rtmp://mediamtx:1935
@@ -55,6 +56,8 @@ services:
     environment:
       <<: *db-env
       NUXT_APP_SECRET: ${NUXT_APP_SECRET:?set NUXT_APP_SECRET in .env}
+      # Lets the relay ask the web app to push stream titles when a channel goes live
+      RELAY_SECRET: ${RELAY_SECRET:?set RELAY_SECRET in .env}
       NUXT_PUBLIC_INGEST_URL: ${NUXT_PUBLIC_INGEST_URL:-rtmp://localhost:1935/live}
       NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:-https://${DOMAIN}}
       # "Connect with …" apps (optional; buttons stay disabled until set)

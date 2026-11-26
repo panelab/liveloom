@@ -95,6 +95,7 @@ const quickAdd: { platform: PlatformId, label: string }[] = [
 
         <HealthPanel v-if="dash.isLive.value" />
 
+
         <!-- Destinations -->
         <UiPanel title="Destinations" flush>
           <template #actions>
@@ -124,6 +125,8 @@ const quickAdd: { platform: PlatformId, label: string }[] = [
             Turn a destination off to stop sending to it, even mid-stream. Click a row to edit it.
           </template>
         </UiPanel>
+
+        <StreamDetails />
       </div>
     </template>
   </UDashboardPanel>

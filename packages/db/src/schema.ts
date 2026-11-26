@@ -26,6 +26,8 @@ export const channels = sqliteTable('channels', {
   youtubeHandle: text('youtube_handle'),
   /** Latest ingest analysis from the relay (JSON, see @sp/shared IngestHealth). */
   ingestHealth: text('ingest_health'),
+  /** Title, description, tags and categories sent to connected platforms (JSON, see web server/utils/streamInfo.ts). */
+  streamInfo: text('stream_info'),
   liveSince: integer('live_since', { mode: 'timestamp_ms' }),
   updatedAt: now('updated_at'),
 })

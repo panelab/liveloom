@@ -52,7 +52,7 @@ const statusOf = (p: string) => props.sources.find((s) => s.platform === p)
       </div>
       <UInput :id="`chat-${f.key}`" v-model="form[f.key]" :placeholder="f.placeholder" class="w-full" />
     </div>
-    <UButton type="submit" label="Save" block :loading="saving" :disabled="!dirty" />
+    <UButton type="submit" label="Save" block :loading="saving" :disabled="!dirty" :variant="dirty ? 'solid' : 'outline'" :color="dirty ? 'primary' : 'neutral'" />
     <p class="text-xs text-dimmed">
       Reading chat needs no login. Connected accounts fill these in for you. YouTube chat appears only while you're live.
     </p>
