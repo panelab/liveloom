@@ -80,3 +80,67 @@ export async function copyText(text: string, what: string) {
   await navigator.clipboard.writeText(text)
   useToast().add({ title: `${what} copied`, icon: 'i-lucide-check', color: 'success', duration: 1500 })
 }
+
+/** The one Add/Edit destination dialog, mounted in the layout and opened from anywhere (pages, ⌘K, the C shortcut). */
+export function useDestinationDialog() {
+  const state = useState<{ open: boolean, editing: DestinationView | null, platform: PlatformId | null }>('dest-dialog', () => ({ open: false, editing: null, platform: null }))
+  return {
+    state,
+    add: (platform: PlatformId | null = null) => { state.value = { open: true, editing: null, platform } },
+    edit: (d: DestinationView) => { state.value = { open: true, editing: d, platform: d.platform } },
+  }
+}
+
+/** Shared row actions for a destination (list menus and the command menu). */
+export function useDestinationActions() {
+  const dash = useDashboard()
+  const toast = useToast()
+  const dialog = useDestinationDialog()
+  const { refresh: refreshConnections } = useConnections()
+
+  async function toggle(d: DestinationView, enabled = !d.enabled) {
+    d.enabled = enabled
+    await $fetch(`/api/destinations/${d.id}`, { method: 'PATCH', body: { enabled } })
+    dash.refresh()
+  }
+  async function remove(d: DestinationView) {
+    if (!confirm(`Delete “${d.name}”? You can add it again later.`)) return
+    await $fetch(`/api/destinations/${d.id}`, { method: 'DELETE' })
+    toast.add({ title: `${d.name} deleted`, duration: 2000 })
+    dash.refresh()
+  }
+  async function refreshKey(d: DestinationView) {
+    try {
+      await $fetch(`/api/connect/${d.platform}/sync`, { method: 'POST' })
+      toast.add({ title: 'Stream key refreshed', icon: 'i-lucide-check', color: 'success', duration: 2000 })
+      dash.refresh()
+    } catch (e: any) {
+      toast.add({ title: e?.data?.message ?? 'Could not refresh', color: 'error' })
+    }
+  }
+  async function disconnect(platform: string, name: string) {
+    if (!confirm(`Disconnect your ${name} account? The destination stays, but LiveLoom can’t refresh its key any more.`)) return
+    await $fetch(`/api/connect/${platform}`, { method: 'DELETE' })
+    await refreshConnections()
+    dash.refresh()
+    toast.add({ title: `${name} disconnected`, duration: 2000 })
+  }
+  function menu(d: DestinationView) {
+    const name = PLATFORM_NAMES[d.platform] ?? d.name
+    return [
+      [
+        { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => dialog.edit(d) },
+        { label: d.enabled ? 'Turn off' : 'Turn on', icon: d.enabled ? 'i-lucide-circle-pause' : 'i-lucide-circle-play', onSelect: () => toggle(d) },
+        { label: 'Copy server URL', icon: 'i-lucide-copy', onSelect: () => copyText(d.serverUrl, 'Server URL') },
+      ],
+      d.connected
+        ? [
+            { label: 'Refresh stream key', icon: 'i-lucide-refresh-cw', onSelect: () => refreshKey(d) },
+            { label: `Disconnect ${name} account`, icon: 'i-lucide-unlink', onSelect: () => disconnect(d.platform, name) },
+          ]
+        : [],
+      [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(d) }],
+    ].filter((g) => g.length)
+  }
+  return { toggle, remove, refreshKey, disconnect, menu }
+}

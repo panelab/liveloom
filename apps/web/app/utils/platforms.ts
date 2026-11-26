@@ -53,3 +53,7 @@ export const pluginDownloads = [
   { os: 'macOS', icon: 'i-simple-icons-apple', file: `obs-multichat-${PLUGIN_VERSION}-macos-universal.pkg`, hint: 'Run the installer (right-click → Open the first time)' },
   { os: 'Linux', icon: 'i-simple-icons-linux', file: `obs-multichat-${PLUGIN_VERSION}-x86_64-linux-gnu.deb`, hint: 'sudo apt install ./obs-multichat-*.deb' },
 ].map((d) => ({ ...d, url: `${REL}/${d.file}` }))
+
+export const PLATFORM_NAMES: Record<string, string> = {
+  youtube: 'YouTube', twitch: 'Twitch', kick: 'Kick', facebook: 'Facebook', tiktok: 'TikTok', x: 'X', custom: 'Custom RTMP',
+}

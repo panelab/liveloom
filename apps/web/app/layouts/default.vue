@@ -1,32 +1,24 @@
 <script setup lang="ts">
-import type { NavigationMenuItem } from '@nuxt/ui'
-
 const { user, clear } = useUserSession()
 const dash = useDashboardPolling()
 const colorMode = useColorMode()
+const route = useRoute()
+const dialog = useDestinationDialog()
+const commandOpen = useState('command-open', () => false)
 
-const nav = computed<NavigationMenuItem[]>(() => [
-  { label: 'Overview', icon: 'i-lucide-layout-grid', to: '/' },
-  {
-    label: 'Destinations',
-    icon: 'i-lucide-radio-tower',
-    to: '/destinations',
-    badge: dash.destinations.value.length ? { label: String(dash.destinations.value.length), variant: 'subtle', color: 'neutral' } : undefined,
-  },
-  { label: 'Studio', icon: 'i-lucide-clapperboard', to: '/studio' },
-  { label: 'Chat', icon: 'i-lucide-messages-square', to: '/chat' },
-  {
-    label: 'Setup',
-    icon: 'i-lucide-settings-2',
-    to: '/setup',
-    badge: dash.issues.value.length ? { label: String(dash.issues.value.length), color: 'warning', variant: 'subtle' } : undefined,
-  },
+interface NavItem { label: string, icon: string, to: string, keys?: string[], badge?: number | null, tone?: 'warning' }
+const primary = computed<NavItem[]>(() => [
+  { label: 'Home', icon: 'i-lucide-house', to: '/', keys: ['G', 'H'], badge: dash.issues.value.length || null, tone: 'warning' },
+  { label: 'Chat', icon: 'i-lucide-messages-square', to: '/chat', keys: ['G', 'C'] },
 ])
-
-const links: NavigationMenuItem[] = [
-  { label: 'OBS plugin', icon: 'i-lucide-puzzle', to: 'https://github.com/panelab/liveloom/releases', target: '_blank' },
-  { label: 'GitHub', icon: 'i-simple-icons-github', to: 'https://github.com/panelab/liveloom', target: '_blank' },
+const goLive: NavItem[] = [
+  { label: 'With OBS', icon: 'i-simple-icons-obsstudio', to: '/setup', keys: ['G', 'O'] },
+  { label: 'From browser', icon: 'i-lucide-monitor-up', to: '/studio', keys: ['G', 'B'] },
 ]
+const secondary: NavItem[] = [
+  { label: 'Settings', icon: 'i-lucide-settings', to: '/settings', keys: ['G', 'S'] },
+]
+const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 
 async function logout() {
   await $fetch('/api/auth/logout', { method: 'POST' })
@@ -40,65 +32,92 @@ const userMenu = computed(() => [
     {
       label: 'Theme',
       icon: colorMode.value === 'dark' ? 'i-lucide-moon' : 'i-lucide-sun',
-      children: [
-        { label: 'Dark', icon: 'i-lucide-moon', type: 'checkbox' as const, checked: colorMode.preference === 'dark', onSelect: () => (colorMode.preference = 'dark') },
-        { label: 'Light', icon: 'i-lucide-sun', type: 'checkbox' as const, checked: colorMode.preference === 'light', onSelect: () => (colorMode.preference = 'light') },
-        { label: 'System', icon: 'i-lucide-monitor', type: 'checkbox' as const, checked: colorMode.preference === 'system', onSelect: () => (colorMode.preference = 'system') },
-      ],
+      children: (['dark', 'light', 'system'] as const).map((m) => ({
+        label: m[0]!.toUpperCase() + m.slice(1),
+        icon: { dark: 'i-lucide-moon', light: 'i-lucide-sun', system: 'i-lucide-monitor' }[m],
+        type: 'checkbox' as const,
+        checked: colorMode.preference === m,
+        onSelect: () => (colorMode.preference = m),
+      })),
     },
+    { label: 'Keyboard shortcuts', icon: 'i-lucide-keyboard', to: '/settings#shortcuts' },
     { label: 'Design system', icon: 'i-lucide-swatch-book', to: '/design' },
+    { label: 'Get the OBS plugin', icon: 'i-lucide-puzzle', to: 'https://github.com/panelab/liveloom/releases', target: '_blank' },
   ],
   [{ label: 'Sign out', icon: 'i-lucide-log-out', onSelect: logout }],
 ])
+
+defineShortcuts({
+  meta_k: () => (commandOpen.value = !commandOpen.value),
+  '/': () => (commandOpen.value = true),
+  c: () => dialog.add(),
+  'g-h': () => navigateTo('/'),
+  'g-c': () => navigateTo('/chat'),
+  'g-o': () => navigateTo('/setup'),
+  'g-b': () => navigateTo('/studio'),
+  'g-s': () => navigateTo('/settings'),
+})
 </script>
 
 <template>
-  <UDashboardGroup unit="rem" storage="local">
-    <UDashboardSidebar
-      collapsible
-      resizable
-      :default-size="15"
-      :min-size="13"
-      :max-size="20"
-      class="bg-muted"
-      :ui="{ header: 'h-14', footer: 'border-t border-default' }"
-    >
+  <UDashboardGroup unit="rem" storage="local" class="bg-surface-app">
+    <UDashboardSidebar collapsible resizable :default-size="14" :min-size="12" :max-size="18">
       <template #header="{ collapsed }">
-        <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5">
-          <AppLogo :size="22" />
-          <span v-if="!collapsed" class="truncate text-base font-semibold tracking-tight text-highlighted">LiveLoom</span>
+        <NuxtLink to="/" class="flex min-w-0 items-center gap-2 rounded-md px-1 py-1">
+          <AppLogo :size="20" />
+          <span v-if="!collapsed" class="truncate text-sm font-semibold tracking-tight text-highlighted">LiveLoom</span>
         </NuxtLink>
+        <div v-if="!collapsed" class="ml-auto flex items-center">
+          <UTooltip text="Search and commands" :kbds="['meta', 'K']">
+            <UButton icon="i-lucide-search" variant="ghost" color="neutral" size="sm" aria-label="Search and commands" @click="commandOpen = true" />
+          </UTooltip>
+          <UTooltip text="Add destination" :kbds="['C']">
+            <UButton icon="i-lucide-plus" variant="ghost" color="neutral" size="sm" aria-label="Add destination" @click="dialog.add()" />
+          </UTooltip>
+        </div>
       </template>
 
       <template #default="{ collapsed }">
         <NuxtLink
           to="/"
-          class="flex h-8 items-center gap-2 rounded-md border px-2.5 transition-colors"
-          :class="dash.isLive.value ? 'border-success/30 bg-success/10' : 'border-default hover:bg-elevated'"
+          class="mb-3 flex h-8 items-center gap-2 rounded-md px-2 text-sm transition-colors"
+          :class="dash.isLive.value ? 'bg-success/10 text-success' : 'text-muted hover:bg-elevated'"
         >
-          <UiStatus :tone="dash.isLive.value ? 'live' : 'off'" :label="collapsed ? undefined : (dash.isLive.value ? 'Live' : 'Offline')" />
-          <span v-if="!collapsed && dash.isLive.value" class="ml-auto font-mono text-xs tabular-nums text-success">{{ dash.uptime.value }}</span>
+          <UiStatus :tone="dash.isLive.value ? 'live' : 'off'" />
+          <template v-if="!collapsed">
+            <span class="font-medium">{{ dash.isLive.value ? 'Live' : 'Offline' }}</span>
+            <span v-if="dash.isLive.value" class="ml-auto font-mono text-xs tabular-nums">{{ dash.uptime.value }}</span>
+          </template>
         </NuxtLink>
 
-        <UNavigationMenu :items="nav" orientation="vertical" :collapsed="collapsed" class="mt-3" />
+        <nav class="space-y-px" aria-label="Main">
+          <SidebarLink v-for="i in primary" :key="i.to" :item="i" :active="isActive(i.to)" :collapsed="collapsed" />
+        </nav>
 
-        <div class="mt-auto">
-          <p v-if="!collapsed" class="label-caps px-2.5 pb-1.5">Resources</p>
-          <UNavigationMenu :items="links" orientation="vertical" :collapsed="collapsed" />
-        </div>
+        <p v-if="!collapsed" class="mb-1 mt-5 px-2 text-xs font-medium text-dimmed">Go live</p>
+        <USeparator v-else class="my-3" />
+        <nav class="space-y-px" aria-label="Go live">
+          <SidebarLink v-for="i in goLive" :key="i.to" :item="i" :active="isActive(i.to)" :collapsed="collapsed" />
+        </nav>
+
+        <nav class="mt-auto space-y-px pt-4" aria-label="Settings">
+          <SidebarLink v-for="i in secondary" :key="i.to" :item="i" :active="isActive(i.to)" :collapsed="collapsed" />
+        </nav>
       </template>
 
       <template #footer="{ collapsed }">
-        <UDropdownMenu :items="userMenu" :content="{ side: 'top', align: 'start' }" :ui="{ content: 'w-56' }" class="w-full">
-          <UButton color="neutral" variant="ghost" block :square="collapsed" class="justify-start data-[state=open]:bg-elevated">
-            <UAvatar :alt="user?.email ?? '?'" size="2xs" />
+        <UDropdownMenu :items="userMenu" :content="{ side: 'top', align: 'start' }" class="w-full">
+          <UButton color="neutral" variant="ghost" block :square="collapsed" class="justify-start px-2 data-[state=open]:bg-elevated">
+            <UAvatar :alt="user?.email ?? '?'" size="3xs" />
             <span v-if="!collapsed" class="truncate text-sm text-toned">{{ user?.email }}</span>
-            <UIcon v-if="!collapsed" name="i-lucide-chevrons-up-down" class="ml-auto size-3.5 text-dimmed" />
           </UButton>
         </UDropdownMenu>
       </template>
     </UDashboardSidebar>
 
     <slot />
+
+    <CommandMenu v-model:open="commandOpen" />
+    <DestinationModal />
   </UDashboardGroup>
 </template>

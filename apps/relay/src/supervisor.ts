@@ -16,16 +16,32 @@ const PROBE_FIRST_MS = 8_000
 const PROBE_EVERY_MS = 5 * 60_000
 
 /**
- * Browser (WebRTC) streams → H.264 High, 2 s keyframes at 30 fps, AAC 48 kHz.
+ * Browser (WebRTC) streams → 1080p30 H.264 High at 6 Mbps (the most every
+ * platform accepts, incl. Twitch), 2 s keyframes, AAC 160k 48 kHz.
  * One encode per channel, shared by every destination.
+ *
+ * - Fixed output size: WebRTC lowers resolution on a bad network, and
+ *   platforms handle mid-stream size changes badly, so always scale/pad to
+ *   1920×1080.
+ * - No `-tune zerolatency`: B-frames and lookahead give visibly better
+ *   quality for ~0.5 s extra latency, which is nothing next to platform delay.
+ * - `aresample=async` + a silent fallback keep audio continuous, so players
+ *   don't stall when the browser has no microphone or drops packets.
  */
 const NORMALIZE_ARGS = [
+  '-fflags', '+genpts+discardcorrupt',
   '-map', '0:v:0', '-map', '0:a:0?',
-  '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
-  '-r', '30', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
-  '-b:v', '4500k', '-maxrate', '4500k', '-bufsize', '9000k',
+  '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,fps=30,format=yuv420p',
+  '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'high', '-level', '4.1',
+  '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-bf', '2', '-rc-lookahead', '15',
+  '-b:v', '6000k', '-maxrate', '6000k', '-bufsize', '6000k', '-x264-params', 'nal-hrd=cbr',
+  '-af', 'aresample=async=1000:first_pts=0',
   '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+  '-max_muxing_queue_size', '1024',
 ]
+
+const VIDEO_CODEC = /^(H26[45]|VP[89]|AV1|MPEG-[124] Video|M-JPEG)$/i
+const NO_VIDEO_MESSAGE = 'LiveLoom is receiving audio but no video. Stop and go live again; if it keeps happening, try another browser.'
 
 export class Supervisor {
   private pushes = new Map<string, Push>()
@@ -35,6 +51,7 @@ export class Supervisor {
   private probes = new Map<string, number>()
   private probing = new Set<string>()
   private health = new Map<string, IngestHealth>()
+  private noVideoLogged = new Set<string>()
   onHealth: HealthListener = () => {}
   private ticking = false
   private timer: Timer | null = null
@@ -111,8 +128,18 @@ export class Supervisor {
 
     // 1b. Browser streams get one normalizer each; destinations read its output.
     const sourceFor = new Map<string, string>() // channelId → RTMP input URL for pushes
+    const noVideo = new Set<string>() // live channels sending audio only: nothing to push yet
     for (const c of liveChannels) {
       const info = live.get(ingestPath(c.ingestKey))!
+      if (!info.tracks.some((t) => VIDEO_CODEC.test(t))) {
+        if (!this.noVideoLogged.has(c.id)) console.warn(`[supervisor] ${c.id.slice(0, 8)} has no video track (${info.tracks.join(', ') || 'none'})`)
+        this.noVideoLogged.add(c.id)
+        noVideo.add(c.id)
+        this.normalizers.get(c.id)?.stop()
+        this.normalizers.delete(c.id)
+        continue
+      }
+      this.noVideoLogged.delete(c.id)
       let n = this.normalizers.get(c.id)
       if (needsNormalize(info)) {
         if (!n) {
@@ -138,13 +165,14 @@ export class Supervisor {
     }
 
     // 2. Desired pushes = enabled destinations of live channels.
-    const wanted = liveIds.length
+    const wantedAll = liveIds.length
       ? await this.db
           .select({ d: destinations, ingestKey: channels.ingestKey })
           .from(destinations)
           .innerJoin(channels, eq(destinations.channelId, channels.id))
           .where(and(inArray(destinations.channelId, liveIds), eq(destinations.enabled, true)))
       : []
+    const wanted = wantedAll.filter((w) => !noVideo.has(w.d.channelId))
     const wantedIds = new Set(wanted.map((w) => w.d.id))
 
     // 3. Stop pushes that are no longer wanted.
@@ -173,6 +201,7 @@ export class Supervisor {
 
     // 4b. Measure ingest health (background, one probe per channel at a time).
     for (const c of liveChannels) {
+      if (noVideo.has(c.id)) continue
       const due = this.probes.get(c.id) ?? 0
       if (Date.now() < due || this.probing.has(c.id)) continue
       this.probes.set(c.id, Date.now() + PROBE_EVERY_MS)
@@ -201,13 +230,18 @@ export class Supervisor {
         sql`${destinationStatus.state} != 'idle'`,
         this.pushes.size ? sql`${destinationStatus.destinationId} NOT IN ${[...this.pushes.keys()]}` : sql`1=1`,
       ))
+    // Audio-only streams: tell the user why nothing is going out.
+    for (const w of wantedAll.filter((w) => noVideo.has(w.d.channelId))) {
+      const row = { destinationId: w.d.id, state: 'error' as const, message: NO_VIDEO_MESSAGE, bitrateKbps: null, startedAt: null, updatedAt: now }
+      await this.db.insert(destinationStatus).values(row).onConflictDoUpdate({ target: destinationStatus.destinationId, set: row })
+    }
   }
 
   private async probe(channelId: string, input: string, platforms: PlatformId[]) {
     this.probing.add(channelId)
     try {
       const h = await probeIngest(input)
-      if (!h || !this.probes.has(channelId)) return
+      if (!h?.video || !this.probes.has(channelId)) return
       this.health.set(channelId, h)
       await this.db.update(channels).set({ ingestHealth: JSON.stringify(h) }).where(eq(channels.id, channelId))
       const issues = healthIssues(h, platforms)

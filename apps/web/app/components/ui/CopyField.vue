@@ -10,8 +10,8 @@ const shown = computed(() => (props.secret && !reveal.value ? '•'.repeat(Math.
       <span class="text-sm font-medium text-toned">{{ label }}</span>
       <span v-if="hint" class="text-xs text-dimmed">{{ hint }}</span>
     </div>
-    <div class="flex h-9 items-center gap-0.5 rounded-md border border-default bg-muted pl-3 pr-1">
-      <code class="flex-1 truncate font-mono text-sm text-highlighted">{{ shown || '—' }}</code>
+    <div class="flex h-8 items-center gap-0.5 rounded-md border border-default bg-default pl-2.5 pr-0.5">
+      <code class="flex-1 truncate font-mono text-xs text-highlighted">{{ shown || '—' }}</code>
       <UTooltip v-if="secret" :text="reveal ? 'Hide' : 'Show'">
         <UButton :icon="reveal ? 'i-lucide-eye-off' : 'i-lucide-eye'" size="xs" variant="ghost" color="neutral" :aria-label="reveal ? `Hide ${label}` : `Show ${label}`" @click="reveal = !reveal" />
       </UTooltip>

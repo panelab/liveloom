@@ -2,7 +2,7 @@
 export default defineEventHandler(async (event) => {
   const p = getRouterParam(event, 'platform')
   if (!isConnectPlatform(p)) throw createError({ statusCode: 404, message: 'Unknown platform' })
-  const back = (q: Record<string, string>) => sendRedirect(event, `/destinations?${new URLSearchParams(q)}`, 302)
+  const back = (q: Record<string, string>) => sendRedirect(event, `/?${new URLSearchParams(q)}`, 302)
 
   const session = await getUserSession(event)
   if (!session.user) return sendRedirect(event, '/login', 302)

@@ -39,6 +39,11 @@ webrtcLocalTCPAddress: :8189
 # public host instead (MTX_WEBRTCADDITIONALHOSTS in docker-compose).
 webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts: []
+# Browsers can take several seconds to emit the first video frame (encoder
+# warm-up, bandwidth probing). The 2 s default dropped the video track and
+# left an audio-only stream, so wait longer before deciding which tracks exist.
+webrtcTrackGatherTimeout: 10s
+webrtcHandshakeTimeout: 15s
 
 hls: no
 moq: no

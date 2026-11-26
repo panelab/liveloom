@@ -2,16 +2,27 @@
 @import "@nuxt/ui";
 
 /*
- * LiveLoom design tokens
- * ----------------------
- * Type scale (px):  2xs 11 · xs 12 · sm 13 · base 14 · lg 16 · xl 20 · 2xl 24
- * Spacing:          4px grid. Page gutter 24 (16 on mobile), panel padding 16,
- *                   row padding 12, gap between panels 24.
- * Radius:           6px controls, 8px panels (rounded-md / rounded-lg).
- * Color roles:      bg / muted / elevated / accented surfaces, border, text
- *                   (dimmed → muted → toned → default → highlighted) from
- *                   Nuxt UI, plus --brand (used sparingly: logo, focus,
- *                   active nav) and status tones (success/info/warning/error).
+ * LiveLoom design system (Linear-style)
+ * =====================================
+ * Principles
+ *   1. Grayscale first. Screens are built in greys; color appears only when it
+ *      means something (live, error, warning) or marks the one primary action.
+ *   2. Reduced visual noise. Hairline borders, no boxes around boxes, dim
+ *      secondary text, the current item is the only highlighted thing.
+ *   3. Dense but calm. 13px UI text, 32px rows, a strict 4px spacing grid.
+ *   4. Elevation by lightness. In dark mode, anything floating (menus, dialogs)
+ *      is a lighter surface with a soft shadow, never an inverted color.
+ *   5. Fast, purposeful motion. 100–200ms, ease-out, scale from the origin.
+ *
+ * Theme inputs (LCH via OKLCH). Every grey, border and hover state below is
+ * derived from these, so a new theme is three numbers:
+ *   --base-hue / --base-chroma   tint of the greys
+ *   --accent-hue / --accent-chroma  the one accent color
+ *   --contrast                   0 = soft … 1 = high-contrast text
+ *
+ * Type scale (px): 2xs 11 · xs 12 · sm 13 (default UI text) · base 14 ·
+ *                  lg 16 · xl 20 · 2xl 26 (display)
+ * Radius: 6px controls and rows, 10px containers and dialogs.
  */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -29,68 +40,144 @@
   --text-lg--line-height: 1.5rem;
   --text-xl: 1.25rem;
   --text-xl--line-height: 1.75rem;
-  --text-2xl: 1.5rem;
+  --text-2xl: 1.625rem;
   --text-2xl--line-height: 2rem;
 
-  --color-brand: #ffb224;
-  --color-brand-muted: color-mix(in oklab, #ffb224 14%, transparent);
+  /* Natural motion: start fast, settle gently. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --color-surface-app: var(--surface-app);
+  --color-surface-raised: var(--surface-raised);
 }
 
 :root {
   --ui-radius: 0.375rem;
+  --ui-header-height: 3rem;
+
+  --base-hue: 265;
+  --base-chroma: 0.006;
+  --accent-hue: 274;
+  --accent-chroma: 0.15;
+  --contrast: 0.5;
 }
 
-/* Light theme surfaces */
+/* ── Light ─────────────────────────────────────────────────────────────── */
 html:root {
-  --ui-primary: #18181b;
-  --ui-bg: #ffffff;
-  --ui-bg-muted: #fafafa;
-  --ui-bg-elevated: #f4f4f5;
-  --ui-bg-accented: #e9e9ec;
-  --ui-border: #e4e4e7;
-  --ui-border-muted: #efeff1;
-  --ui-border-accented: #d4d4d8;
+  --g: var(--base-chroma) var(--base-hue);
+  --surface-app: oklch(0.972 var(--g));
+  --surface-raised: oklch(1 0 0);
+  --ui-bg: oklch(0.995 var(--g));
+  --ui-bg-muted: oklch(0.982 var(--g));
+  --ui-bg-elevated: oklch(0.962 var(--g));
+  --ui-bg-accented: oklch(0.935 var(--g));
+  --ui-bg-inverted: oklch(0.2 var(--g));
+  --ui-border: oklch(0.915 var(--g));
+  --ui-border-muted: oklch(0.945 var(--g));
+  --ui-border-accented: oklch(0.86 var(--g));
+  --ui-border-inverted: oklch(0.2 var(--g));
+
+  --ui-text-highlighted: oklch(calc(0.22 - var(--contrast) * 0.06) var(--g));
+  --ui-text: oklch(calc(0.34 - var(--contrast) * 0.06) var(--g));
+  --ui-text-toned: oklch(calc(0.45 - var(--contrast) * 0.05) var(--g));
+  --ui-text-muted: oklch(calc(0.55 - var(--contrast) * 0.05) var(--g));
+  --ui-text-dimmed: oklch(calc(0.66 - var(--contrast) * 0.05) var(--g));
+  --ui-text-inverted: oklch(0.99 0 0);
+
+  --ui-primary: oklch(0.55 var(--accent-chroma) var(--accent-hue));
+  --shadow-raised: 0 0 0 1px oklch(0.2 0.01 var(--base-hue) / 0.06), 0 4px 12px -2px oklch(0.2 0.01 var(--base-hue) / 0.08), 0 16px 32px -8px oklch(0.2 0.01 var(--base-hue) / 0.12);
 }
 
-/* Dark theme: near-black, neutral (not blue-tinted) */
+/* ── Dark (default) ────────────────────────────────────────────────────── */
 html.dark:root {
-  --ui-primary: #fafafa;
-  --ui-bg: #09090b;
-  --ui-bg-muted: #0f0f12;
-  --ui-bg-elevated: #141417;
-  --ui-bg-accented: #1c1c20;
-  --ui-border: #232328;
-  --ui-border-muted: #1a1a1e;
-  --ui-border-accented: #303036;
+  --g: var(--base-chroma) var(--base-hue);
+  --surface-app: oklch(0.135 var(--g));
+  --surface-raised: oklch(0.215 var(--g));
+  --ui-bg: oklch(0.165 var(--g));
+  --ui-bg-muted: oklch(0.185 var(--g));
+  --ui-bg-elevated: oklch(0.215 var(--g));
+  --ui-bg-accented: oklch(0.255 var(--g));
+  --ui-bg-inverted: oklch(0.96 var(--g));
+  --ui-border: oklch(0.245 var(--g));
+  --ui-border-muted: oklch(0.205 var(--g));
+  --ui-border-accented: oklch(0.31 var(--g));
+  --ui-border-inverted: oklch(0.96 var(--g));
+
+  --ui-text-highlighted: oklch(calc(0.95 + var(--contrast) * 0.04) var(--g));
+  --ui-text: oklch(calc(0.84 + var(--contrast) * 0.05) var(--g));
+  --ui-text-toned: oklch(calc(0.74 + var(--contrast) * 0.04) var(--g));
+  --ui-text-muted: oklch(calc(0.62 + var(--contrast) * 0.04) var(--g));
+  --ui-text-dimmed: oklch(calc(0.49 + var(--contrast) * 0.04) var(--g));
+  --ui-text-inverted: oklch(0.15 var(--g));
+
+  --ui-primary: oklch(0.62 var(--accent-chroma) var(--accent-hue));
+  --shadow-raised: 0 0 0 1px oklch(1 0 0 / 0.06), 0 4px 12px -2px oklch(0 0 0 / 0.4), 0 16px 32px -8px oklch(0 0 0 / 0.5);
 }
 
 html {
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  font-feature-settings: 'cv01', 'cv11', 'ss03';
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--surface-app);
 }
 
 body {
-  font-size: var(--text-base);
-  line-height: var(--text-base--line-height);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ui-text);
+  background: var(--surface-app);
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.012em;
 }
 
 ::selection {
-  background: var(--color-brand-muted);
+  background: color-mix(in oklab, var(--ui-primary) 30%, transparent);
 }
 
-/* Visible, consistent keyboard focus everywhere */
 :focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--color-brand) 70%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--ui-primary) 70%, transparent);
   outline-offset: 2px;
 }
 
-/* Small uppercase label used above stats and in table headers */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Display headline: tighter tracking as type gets bigger. */
+@utility text-display {
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl--line-height);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--ui-text-highlighted);
+}
+
+/* Small section label above a group of rows. */
 @utility label-caps {
-  font-size: var(--text-2xs);
-  line-height: var(--text-2xs--line-height);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--ui-text-dimmed);
+}
+
+/* Floating surfaces: menus, dialogs, the command menu. */
+@utility surface-raised {
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+/* One list row: 36px tall, hairline between rows, quiet hover. */
+@utility row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.25rem;
+  padding-inline: 0.75rem;
+  transition: background-color 80ms var(--ease-out);
 }

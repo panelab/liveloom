@@ -89,7 +89,7 @@ export class Push {
       this.failures = ranFor > STABLE_MS ? 1 : this.failures + 1
       const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (this.failures - 1))
       this.state = this.failures >= 5 ? 'error' : 'retrying'
-      this.message = this.redact(lastErr || `ffmpeg exited (${code})`) + ` · retry in ${Math.round(delay / 1000)}s`
+      this.message = `${friendlyError(this.redact(lastErr || `ffmpeg exited (${code})`))} Retrying in ${Math.round(delay / 1000)}s.`
       this.bitrateKbps = null
       console.warn(`[push ${this.destinationId.slice(0, 8)}] ${this.message}`)
       this.retryTimer = setTimeout(() => !this.stopped && this.spawn(), delay)
@@ -135,4 +135,14 @@ export class Push {
       // process gone
     }
   }
+}
+
+/** Turn ffmpeg's last error line into something a streamer can act on. */
+export function friendlyError(err: string): string {
+  if (/Error opening output.*(Input\/output error|Connection reset|Broken pipe)|Error opening output files: Input\/output error/i.test(err))
+    return 'The platform refused the stream. The stream key is probably wrong or was reset: copy a fresh key from the platform and edit this destination.'
+  if (/Error opening output.*(Connection refused|timed out|Network is unreachable|Name or service not known|Temporary failure)/i.test(err))
+    return 'Can’t reach the platform’s server. Check the server URL.'
+  if (/Error opening input/i.test(err)) return 'Waiting for your stream to start…'
+  return err
 }

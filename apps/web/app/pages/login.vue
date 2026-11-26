@@ -28,8 +28,8 @@ async function submit() {
 </script>
 
 <template>
-  <div class="relative grid min-h-dvh place-items-center bg-default px-4">
-    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--ui-bg-accented),transparent_60%)] opacity-70" />
+  <div class="relative grid min-h-dvh place-items-center bg-surface-app px-4">
+    
     <div class="relative w-full max-w-sm">
       <div class="mb-8 flex flex-col items-center gap-3 text-center">
         <AppLogo :size="40" />
@@ -41,7 +41,7 @@ async function submit() {
         </div>
       </div>
 
-      <form class="space-y-3 rounded-lg border border-default bg-elevated/60 p-5" @submit.prevent="submit">
+      <form class="space-y-3 rounded-xl surface-raised p-5" @submit.prevent="submit">
         <UFormField label="Email">
           <UInput v-model="state.email" type="email" autocomplete="email" required autofocus class="w-full" size="md" />
         </UFormField>

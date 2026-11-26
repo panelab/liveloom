@@ -44,8 +44,8 @@ onMounted(() => { if (code.value.replace('-', '').length === 8) lookup() })
 </script>
 
 <template>
-  <div class="relative grid min-h-dvh place-items-center bg-default px-4">
-    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--ui-bg-accented),transparent_60%)] opacity-70" />
+  <div class="relative grid min-h-dvh place-items-center bg-surface-app px-4">
+    
     <div class="relative w-full max-w-sm">
       <div class="mb-6 flex flex-col items-center gap-3 text-center">
         <div class="flex items-center gap-2">
@@ -59,7 +59,7 @@ onMounted(() => { if (code.value.replace('-', '').length === 8) lookup() })
         <p class="text-sm text-muted">Signed in as <span class="text-toned">{{ user?.email }}</span></p>
       </div>
 
-      <div class="rounded-lg border border-default bg-elevated/60 p-5">
+      <div class="rounded-xl surface-raised p-5">
         <template v-if="done === 'approved'">
           <div class="flex flex-col items-center gap-2 py-4 text-center">
             <span class="grid size-10 place-items-center rounded-full bg-success/15 text-success"><UIcon name="i-lucide-check" class="size-5" /></span>

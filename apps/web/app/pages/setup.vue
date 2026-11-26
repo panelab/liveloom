@@ -1,34 +1,28 @@
 <script setup lang="ts">
-const toast = useToast()
 const dash = useDashboard()
 const origin = useSiteOrigin()
-const { data: channel, refresh: refreshChannel } = await useChannel()
+const { data: channel } = await useChannel()
 const { data: chat, refresh: refreshChat } = await useChatConfig()
+// Notice the plugin signing in without a reload.
+let poll: ReturnType<typeof setInterval> | undefined
+onMounted(() => { poll = setInterval(() => { if (!chat.value?.pluginSeen && document.visibilityState === 'visible') void refreshChat() }, 3000) })
+onBeforeUnmount(() => clearInterval(poll))
 
-async function rotateIngest() {
-  if (!confirm('Reset your stream key? OBS will need the new one (sign in from the plugin again, or paste it).')) return
-  try {
-    await $fetch('/api/channel/rotate', { method: 'POST' })
-    await refreshChannel()
-    toast.add({ title: 'Stream key reset', icon: 'i-lucide-check', color: 'success' })
-  } catch (e: any) {
-    toast.add({ title: e?.data?.message ?? 'Could not reset key', color: 'error' })
-  }
-}
+// Suggest the download for this computer (decided after hydration to avoid a mismatch).
+const os = ref<string | null>(null)
+onMounted(() => {
+  const ua = navigator.userAgent
+  os.value = /Windows/i.test(ua) ? 'Windows' : /Mac OS X|Macintosh/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : null
+})
+const mine = computed(() => pluginDownloads.find((d) => d.os === os.value) ?? null)
+const others = computed(() => pluginDownloads.filter((d) => d !== mine.value))
+const signedIn = computed(() => !!chat.value?.pluginSeen)
 
-async function rotateToken() {
-  if (!confirm('Reset the plugin token? Signed-in OBS plugins will need to sign in again.')) return
-  await $fetch('/api/chat/rotate', { method: 'POST' })
-  await refreshChat()
-  toast.add({ title: 'Plugin token reset', icon: 'i-lucide-check', color: 'success' })
-}
-
-const obsSettings = [
+const settings = [
   { k: 'Keyframe interval', v: '2 s' },
-  { k: 'Video bitrate', v: '6000 Kbps' },
-  { k: 'Rate control', v: 'CBR' },
-  { k: 'Audio', v: 'AAC · 160 Kbps' },
+  { k: 'Bitrate', v: '6000 Kbps CBR' },
   { k: 'Resolution', v: '1920×1080' },
+  { k: 'Audio', v: 'AAC 160 Kbps' },
 ]
 const manualOpen = ref(false)
 </script>
@@ -36,55 +30,84 @@ const manualOpen = ref(false)
 <template>
   <UDashboardPanel id="setup">
     <template #header>
-      <UDashboardNavbar title="Setup" :ui="{ root: 'h-14' }" />
+      <UDashboardNavbar title="Go live with OBS" />
     </template>
 
     <template #body>
-      <div class="mx-auto w-full max-w-3xl space-y-6">
-        <UiPageIntro title="Set up OBS" description="The Multichat plugin signs OBS in to LiveLoom and fills in your stream settings, so there’s nothing to copy." />
+      <div class="mx-auto w-full max-w-2xl space-y-8 py-2">
+        <div>
+          <h1 class="text-display">Go live with OBS</h1>
+          <p class="mt-1.5 max-w-lg text-sm text-muted">Install the LiveLoom plugin and sign in. It fills in OBS’s stream settings for you, so there’s nothing to copy.</p>
+        </div>
 
         <HealthPanel v-if="dash.isLive.value" />
 
-        <UiPanel title="1. Install the Multichat plugin" :description="`Version ${PLUGIN_VERSION} · OBS 30 or newer`">
-          <div class="grid gap-2 sm:grid-cols-3">
-            <a
-              v-for="d in pluginDownloads"
-              :key="d.os"
-              :href="d.url"
-              class="group rounded-md border border-default bg-muted px-3 py-2.5 transition-colors hover:border-accented hover:bg-elevated"
-            >
-              <div class="flex items-center gap-2">
-                <UIcon :name="d.icon" class="size-4 text-highlighted" />
-                <span class="text-sm font-medium text-highlighted">{{ d.os }}</span>
-                <UIcon name="i-lucide-download" class="ml-auto size-3.5 text-dimmed group-hover:text-highlighted" />
+        <ol class="overflow-hidden rounded-[10px] border border-muted bg-muted/60">
+          <!-- 1 -->
+          <li class="flex gap-4 border-b border-muted p-5">
+            <span class="grid size-6 shrink-0 place-items-center rounded-full border border-primary text-xs font-semibold text-primary">1</span>
+            <div class="min-w-0 flex-1 space-y-3">
+              <div>
+                <p class="text-sm font-medium text-highlighted">Install the plugin</p>
+                <p class="text-sm text-muted">Version {{ PLUGIN_VERSION }}, for OBS 30 or newer. Close OBS first.</p>
               </div>
-              <p class="mt-1 text-xs text-dimmed">{{ d.hint }}</p>
-            </a>
-          </div>
-        </UiPanel>
+              <div class="flex flex-wrap items-center gap-2">
+                <UButton v-if="mine" :label="`Download for ${mine.os}`" :icon="mine.icon" :to="mine.url" external />
+                <UButton
+                  v-for="d in (mine ? others : pluginDownloads)"
+                  :key="d.os"
+                  :label="d.os"
+                  :icon="d.icon"
+                  :to="d.url"
+                  external
+                  color="neutral"
+                  :variant="mine ? 'ghost' : 'outline'"
+                />
+              </div>
+              <p v-if="mine" class="font-mono text-xs text-dimmed">{{ mine.hint }}</p>
+            </div>
+          </li>
+          <!-- 2 -->
+          <li class="flex gap-4 border-b border-muted p-5">
+            <span
+              class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold"
+              :class="signedIn ? 'bg-primary text-white' : 'border border-accented text-muted'"
+            >
+              <UIcon v-if="signedIn" name="i-lucide-check" class="size-3.5" /><template v-else>2</template>
+            </span>
+            <div class="min-w-0 flex-1 space-y-1">
+              <p class="text-sm font-medium text-highlighted">Sign in from OBS</p>
+              <p class="text-sm text-muted">
+                Open OBS. In the <span class="text-highlighted">Multichat</span> dock, click <span class="text-highlighted">Sign in to LiveLoom</span>, check the code matches, and click <span class="text-highlighted">Approve</span>.
+              </p>
+              <p class="text-xs text-dimmed">
+                Browser didn’t open? Go to <ULink to="/device" class="font-mono text-toned underline">{{ origin.replace(/^https?:\/\//, '') }}/device</ULink> and enter the code.
+              </p>
+              <p v-if="signedIn" class="flex items-center gap-1.5 pt-1 text-sm text-success"><UIcon name="i-lucide-check" class="size-4" />OBS is signed in</p>
+            </div>
+          </li>
+          <!-- 3 -->
+          <li class="flex gap-4 p-5">
+            <span
+              class="grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold"
+              :class="dash.isLive.value ? 'bg-primary text-white' : 'border border-accented text-muted'"
+            >
+              <UIcon v-if="dash.isLive.value" name="i-lucide-check" class="size-3.5" /><template v-else>3</template>
+            </span>
+            <div class="min-w-0 flex-1 space-y-1">
+              <p class="text-sm font-medium text-highlighted">Press Start Streaming</p>
+              <p class="text-sm text-muted">Every destination that’s on goes live together. LiveLoom checks your stream a few seconds later and tells you if anything needs changing.</p>
+            </div>
+          </li>
+        </ol>
 
-        <UiPanel title="2. Sign in from OBS">
-          <template #actions>
-            <UBadge v-if="chat?.pluginSeen" label="Signed in" icon="i-lucide-check" color="success" variant="subtle" />
-          </template>
-          <ol class="space-y-2 text-sm text-muted">
-            <li class="flex gap-2"><span class="font-mono text-dimmed">1</span><span>Restart OBS. The <span class="text-highlighted">Multichat</span> dock opens.</span></li>
-            <li class="flex gap-2"><span class="font-mono text-dimmed">2</span><span>Click <span class="text-highlighted">Sign in to LiveLoom</span> in the dock. Your browser opens with a code.</span></li>
-            <li class="flex gap-2"><span class="font-mono text-dimmed">3</span><span>Check the code matches OBS and click <span class="text-highlighted">Approve</span>. OBS’s stream settings are filled in.</span></li>
-          </ol>
-          <p class="mt-3 text-sm text-muted">
-            Browser didn’t open? Go to <ULink to="/device" class="font-mono text-highlighted underline">{{ origin.replace(/^https?:\/\//, '') }}/device</ULink> and enter the code.
-          </p>
-        </UiPanel>
-
-        <UiPanel title="3. Recommended OBS settings" description="LiveLoom forwards your stream as-is, so every platform receives exactly these.">
-          <dl class="grid grid-cols-2 overflow-hidden rounded-md border border-default divide-default sm:grid-cols-5 sm:divide-x">
-            <div v-for="s in obsSettings" :key="s.k" class="px-3 py-2">
-              <dt class="text-2xs text-dimmed">{{ s.k }}</dt>
+        <UiPanel title="What the plugin sets" description="LiveLoom passes your stream through untouched, so every platform gets exactly this." plain>
+          <dl class="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <div v-for="s in settings" :key="s.k">
+              <dt class="text-xs text-dimmed">{{ s.k }}</dt>
               <dd class="font-mono text-xs text-highlighted">{{ s.v }}</dd>
             </div>
           </dl>
-          <p class="mt-2 text-xs text-dimmed">OBS → Settings → Output (Output Mode: Advanced) → Streaming. 6000 Kbps works on every platform.</p>
         </UiPanel>
 
         <UCollapsible v-model:open="manualOpen">
@@ -92,32 +115,15 @@ const manualOpen = ref(false)
             variant="ghost"
             color="neutral"
             :trailing-icon="manualOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
-            label="Set up manually instead"
+            label="Not using the plugin? Copy your server and key"
             class="-ml-2.5"
           />
           <template #content>
-            <UiPanel class="mt-2" title="Manual setup" description="For OBS without the plugin, or other streaming software. OBS → Settings → Stream → Service: Custom…">
-              <div class="space-y-4">
-                <UiCopyField label="Server" :value="channel?.ingestUrl ?? ''" />
-                <UiCopyField label="Stream key" :value="channel?.ingestKey ?? ''" secret hint="Keep this private">
-                  <template #actions>
-                    <UTooltip :text="dash.isLive.value ? 'Stop streaming first' : 'Reset key'">
-                      <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset stream key" :disabled="dash.isLive.value" @click="rotateIngest" />
-                    </UTooltip>
-                  </template>
-                </UiCopyField>
-                <USeparator />
-                <p class="text-sm text-muted">Plugin without sign-in: click ⚙ in the Multichat dock and paste these.</p>
-                <UiCopyField label="Plugin server" :value="origin" />
-                <UiCopyField label="Plugin token" :value="chat?.token ?? ''" secret>
-                  <template #actions>
-                    <UTooltip text="Reset token">
-                      <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset plugin token" @click="rotateToken" />
-                    </UTooltip>
-                  </template>
-                </UiCopyField>
-              </div>
-            </UiPanel>
+            <div class="mt-3 space-y-4 rounded-[10px] border border-muted bg-muted/60 p-4">
+              <p class="text-sm text-muted">OBS → Settings → Stream → Service: <span class="text-highlighted">Custom…</span></p>
+              <UiCopyField label="Server" :value="channel?.ingestUrl ?? ''" />
+              <UiCopyField label="Stream key" :value="channel?.ingestKey ?? ''" secret hint="Keep this private" />
+            </div>
           </template>
         </UCollapsible>
       </div>

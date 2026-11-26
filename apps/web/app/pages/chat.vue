@@ -41,7 +41,7 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
 <template>
   <UDashboardPanel id="chat" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
     <template #header>
-      <UDashboardNavbar title="Chat" :ui="{ root: 'h-14' }">
+      <UDashboardNavbar title="Chat">
         <template #trailing>
           <UiStatus
             :tone="connected ? 'live' : 'info'"
@@ -106,7 +106,7 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
   <!-- Sources: side panel on desktop, slideover on mobile -->
   <UDashboardPanel id="chat-sources" :default-size="20" :min-size="18" :max-size="26" resizable class="hidden lg:flex" :ui="{ body: 'gap-6' }">
     <template #header>
-      <UDashboardNavbar title="Sources" :toggle="false" :ui="{ root: 'h-14' }" />
+      <UDashboardNavbar title="Sources" :toggle="false" />
     </template>
     <template #body>
       <ChatSourcesForm :sources="sources" />

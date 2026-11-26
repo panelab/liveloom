@@ -3,11 +3,11 @@ defineProps<{ label: string, value: string, mono?: boolean, tone?: 'success' | '
 </script>
 
 <template>
-  <div class="px-4 py-3">
+  <div class="min-w-0">
     <p class="label-caps">{{ label }}</p>
     <p
-      class="mt-1 text-xl font-semibold tabular-nums"
-      :class="[mono && 'font-mono tracking-tight', tone ? `text-${tone}` : 'text-highlighted']"
+      class="mt-0.5 truncate text-lg font-medium tabular-nums"
+      :class="[mono && 'font-mono text-base tracking-tight', tone ? `text-${tone}` : 'text-highlighted']"
     >
       {{ value }}
     </p>
