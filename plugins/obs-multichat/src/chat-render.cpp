@@ -37,7 +37,7 @@ QColor nameColor(const Message &m)
 	}
 	static const QColor palette[] = {{255, 99, 99}, {99, 179, 255}, {120, 220, 120}, {255, 180, 80},
 					 {200, 140, 255}, {255, 140, 200}, {90, 220, 220}, {240, 220, 100}};
-	const uint h = qHash(QString::fromStdString(m.author));
+	const size_t h = qHash(QString::fromStdString(m.author));
 	return palette[h % (sizeof(palette) / sizeof(palette[0]))];
 }
 
