@@ -36,9 +36,20 @@ export const PLATFORMS: Record<PlatformId, PlatformPreset> = {
   custom: { id: 'custom', name: 'Custom RTMP', color: '#64748b', serverUrl: '' },
 }
 
+/**
+ * Fixes common copy-paste mistakes in server URLs. Kick (and other Amazon IVS
+ * ingests, *.live-video.net) need the "/app" path; their dashboards make it
+ * easy to copy the URL without it.
+ */
+export function normalizeServerUrl(serverUrl: string): string {
+  let u = serverUrl.trim().replace(/\/+$/, '')
+  if (/^rtmps?:\/\/[^/]+\.live-video\.net(:\d+)?$/i.test(u)) u += '/app'
+  return u
+}
+
 /** Full push URL: server + "/" + key. */
 export function pushUrl(serverUrl: string, streamKey: string): string {
-  return `${serverUrl.replace(/\/+$/, '')}/${streamKey}`
+  return `${normalizeServerUrl(serverUrl)}/${streamKey}`
 }
 
 export function isValidServerUrl(u: string): boolean {
