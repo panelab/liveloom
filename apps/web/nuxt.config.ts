@@ -6,6 +6,8 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui', 'nuxt-auth-utils'],
   css: ['~/assets/css/main.css'],
   devtools: { enabled: true },
+  colorMode: { preference: 'dark', fallback: 'dark' },
+  fonts: { families: [{ name: 'Inter', provider: 'google' }, { name: 'JetBrains Mono', provider: 'google' }] },
   app: {
     head: { title: 'LiveLoom', link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }] },
   },
@@ -23,7 +25,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     // Dev: forward chat to the relay like Caddy does in production
-    devProxy: { '/chat': { target: 'http://127.0.0.1:8787/chat', changeOrigin: true } },
+    devProxy: { '/chat/events': { target: 'http://127.0.0.1:8787/chat/events', changeOrigin: true } },
     preset: process.env.NITRO_PRESET || 'bun',
     cloudflare: { nodeCompat: true, deployConfig: true },
   },

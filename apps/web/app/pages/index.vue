@@ -1,133 +1,109 @@
 <script setup lang="ts">
-import type { DestinationView } from '~/components/DestinationCard.vue'
+const dash = useDashboard()
+const { data: chat } = await useChatConfig()
 
-const { user, clear } = useUserSession()
-const toast = useToast()
+const chatSources = computed(() => [chat.value?.twitch, chat.value?.kick, chat.value?.youtube].filter(Boolean).length)
 
-const { data: channel, refresh: refreshChannel } = await useFetch('/api/channel')
-const { data, refresh } = await useFetch('/api/destinations')
+const steps = computed(() => [
+  { done: dash.destinations.value.length > 0, title: 'Add a destination', description: 'YouTube, Twitch, Kick, or any RTMP server.', to: '/destinations', cta: 'Add' },
+  { done: dash.isLive.value || dash.destinations.value.some((d) => d.status.startedAt), title: 'Point OBS at LiveLoom', description: 'Paste the server and stream key into OBS.', to: '/setup', cta: 'Open setup' },
+  { done: chatSources.value > 0, title: 'Connect your chats', description: 'Merge Twitch, Kick and YouTube chat in one feed.', to: '/chat', cta: 'Connect' },
+])
+const setupDone = computed(() => steps.value.every((s) => s.done))
 
-// Poll status while the tab is visible. The relay writes it to the DB every ~2s.
-const now = ref(Date.now())
-let timer: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now()
-    if (document.visibilityState === 'visible') refresh()
-  }, 2000)
-})
-onBeforeUnmount(() => clearInterval(timer))
-
-const isLive = computed(() => data.value?.isLive ?? false)
-const destinations = computed(() => (data.value?.destinations ?? []) as DestinationView[])
-const liveCount = computed(() => destinations.value.filter((d) => d.enabled && d.status.state === 'live').length)
-const enabledCount = computed(() => destinations.value.filter((d) => d.enabled).length)
-
-const modalOpen = ref(false)
-const editing = ref<DestinationView | null>(null)
-function openAdd() { editing.value = null; modalOpen.value = true }
-function openEdit(d: DestinationView) { editing.value = d; modalOpen.value = true }
-
-async function toggle(d: DestinationView, enabled: boolean) {
-  d.enabled = enabled
-  await $fetch(`/api/destinations/${d.id}`, { method: 'PATCH', body: { enabled } })
-  refresh()
-}
-
-async function remove(d: DestinationView) {
-  if (!confirm(`Delete “${d.name}”?`)) return
-  await $fetch(`/api/destinations/${d.id}`, { method: 'DELETE' })
-  toast.add({ title: `${d.name} removed` })
-  refresh()
-}
-
-async function logout() {
-  await $fetch('/api/auth/logout', { method: 'POST' })
-  await clear()
-  await navigateTo('/login')
-}
+const stats = computed(() => [
+  { label: 'Status', value: dash.isLive.value ? 'Live' : 'Offline', mono: false, accent: dash.isLive.value ? 'text-success' : 'text-highlighted' },
+  { label: 'Uptime', value: dash.uptime.value ?? '—', mono: true },
+  { label: 'Destinations live', value: `${dash.streaming.value.length} / ${dash.enabled.value.length}`, mono: true },
+  { label: 'Outgoing', value: formatKbps(dash.totalKbps.value), mono: true },
+])
 </script>
 
 <template>
-  <div class="min-h-dvh bg-default">
-    <header class="border-b border-default">
-      <div class="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <img src="/icon.svg" alt="" class="size-7">
-          <span class="font-semibold">LiveLoom</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <UColorModeButton />
-          <UDropdownMenu :items="[{ label: user?.email ?? '', type: 'label' }, { label: 'Sign out', icon: 'i-lucide-log-out', onSelect: logout }]">
-            <UButton icon="i-lucide-user" variant="ghost" color="neutral" aria-label="Account" />
-          </UDropdownMenu>
-        </div>
-      </div>
-    </header>
+  <UDashboardPanel id="overview">
+    <template #header>
+      <UDashboardNavbar title="Overview" :ui="{ root: 'h-12' }">
+        <template #right>
+          <UButton label="Add destination" icon="i-lucide-plus" to="/destinations?add=1" />
+        </template>
+      </UDashboardNavbar>
+    </template>
 
-    <main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <!-- Live status banner -->
-      <div
-        class="rounded-xl border p-4 flex flex-wrap items-center gap-4 justify-between"
-        :class="isLive ? 'border-success/40 bg-success/5' : 'border-default bg-elevated/40'"
-      >
-        <div class="flex items-center gap-3">
-          <span class="relative flex size-3">
-            <span v-if="isLive" class="absolute inline-flex size-full rounded-full bg-success opacity-75 animate-ping" />
-            <span class="relative inline-flex size-3 rounded-full" :class="isLive ? 'bg-success' : 'bg-muted'" />
+    <template #body>
+      <div class="mx-auto w-full max-w-5xl space-y-6">
+        <!-- Status header -->
+        <div class="flex flex-wrap items-center gap-3">
+          <StatusDot :color="dash.isLive.value ? 'bg-success' : 'bg-(--ui-text-dimmed)'" :pulse="dash.isLive.value" />
+          <h1 class="text-lg font-semibold text-highlighted">
+            {{ dash.isLive.value ? 'You are live' : 'You are offline' }}
+          </h1>
+          <span class="text-sm text-muted">
+            {{ dash.isLive.value
+              ? `Sending to ${dash.streaming.value.length} of ${dash.enabled.value.length} destinations`
+              : 'Start streaming in OBS and every enabled destination goes live.' }}
           </span>
-          <div>
-            <p class="font-semibold">{{ isLive ? 'You are live' : 'Offline' }}</p>
-            <p class="text-sm text-muted">
-              <template v-if="isLive">
-                {{ liveCount }} of {{ enabledCount }} destinations streaming
-                <span v-if="data?.liveSince" class="tabular-nums"> · {{ formatDuration(now - data.liveSince) }}</span>
-              </template>
-              <template v-else>Start streaming in OBS and every enabled destination goes live.</template>
-            </p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 rounded-lg border border-default divide-x divide-y lg:divide-y-0 divide-default overflow-hidden">
+          <div v-for="s in stats" :key="s.label" class="bg-elevated/40 px-4 py-3">
+            <p class="section-label">{{ s.label }}</p>
+            <p class="mt-1 text-xl font-semibold tabular-nums" :class="[s.mono && 'font-mono', s.accent ?? 'text-highlighted']">{{ s.value }}</p>
           </div>
         </div>
-      </div>
 
-      <div class="grid gap-6 lg:grid-cols-[1fr_22rem]">
-        <section class="space-y-3 min-w-0">
-          <div class="flex items-center justify-between">
-            <h2 class="font-semibold">Destinations</h2>
-            <UButton label="Add destination" icon="i-lucide-plus" size="sm" @click="openAdd" />
+        <!-- Getting started -->
+        <Section v-if="!setupDone" title="Get started" description="Three steps to go live everywhere at once.">
+          <ol class="divide-y divide-default -my-2">
+            <li v-for="(s, i) in steps" :key="s.title" class="flex items-center gap-3 py-2.5">
+              <span
+                class="grid size-5 shrink-0 place-items-center rounded-full border text-[11px] font-medium"
+                :class="s.done ? 'border-success/40 bg-success/15 text-success' : 'border-default text-muted'"
+              >
+                <UIcon v-if="s.done" name="i-lucide-check" class="size-3" />
+                <template v-else>{{ i + 1 }}</template>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm" :class="s.done ? 'text-muted line-through' : 'text-highlighted'">{{ s.title }}</p>
+                <p class="text-xs text-dimmed">{{ s.description }}</p>
+              </div>
+              <UButton v-if="!s.done" :label="s.cta" :to="s.to" variant="outline" color="neutral" size="xs" trailing-icon="i-lucide-arrow-right" />
+            </li>
+          </ol>
+        </Section>
+
+        <!-- Destinations summary -->
+        <Section title="Destinations" description="Where your stream is sent.">
+          <template #actions>
+            <UButton label="Manage" to="/destinations" variant="ghost" color="neutral" size="xs" trailing-icon="i-lucide-arrow-right" />
+          </template>
+          <div v-if="dash.pending.value" class="space-y-2">
+            <USkeleton v-for="i in 3" :key="i" class="h-9" />
           </div>
-
-          <div v-if="!destinations.length" class="rounded-xl border border-dashed border-default p-8 text-center">
-            <UIcon name="i-lucide-radio-tower" class="size-8 text-muted mx-auto" />
-            <p class="mt-2 font-medium">No destinations yet</p>
-            <p class="text-sm text-muted">Add YouTube, Twitch, Kick and more. You stream once and we send it to all of them.</p>
-            <UButton class="mt-4" label="Add your first destination" icon="i-lucide-plus" @click="openAdd" />
-          </div>
-
-          <DestinationCard
-            v-for="d in destinations"
-            :key="d.id"
-            :dest="d"
-            :channel-live="isLive"
-            :now="now"
-            @edit="openEdit(d)"
-            @toggle="(v) => toggle(d, v)"
-            @remove="remove(d)"
+          <UEmpty
+            v-else-if="!dash.destinations.value.length"
+            icon="i-lucide-radio-tower"
+            title="No destinations yet"
+            description="Add YouTube, Twitch or Kick. You stream once and LiveLoom sends it to all of them."
+            :actions="[{ label: 'Add destination', icon: 'i-lucide-plus', to: '/destinations?add=1' }]"
+            variant="naked"
+            size="sm"
           />
-        </section>
-
-        <aside class="space-y-6">
-          <IngestCard
-            v-if="channel"
-            :ingest-url="channel.ingestUrl"
-            :ingest-key="channel.ingestKey"
-            :is-live="isLive"
-            @rotated="refreshChannel"
-          />
-          <ChatCard />
-        </aside>
+          <ul v-else class="-my-1 divide-y divide-default">
+            <li v-for="d in dash.destinations.value" :key="d.id" class="flex items-center gap-3 py-2">
+              <UIcon :name="platformIcon[d.platform] ?? platformIcon.custom" class="size-4 shrink-0" :style="{ color: platformColor[d.platform] }" />
+              <span class="flex-1 truncate text-sm" :class="d.enabled ? 'text-highlighted' : 'text-dimmed'">{{ d.name }}</span>
+              <span class="hidden sm:block font-mono text-xs text-muted tabular-nums w-20 text-right">
+                {{ d.enabled && d.status.state === 'live' ? formatKbps(d.status.bitrateKbps) : '' }}
+              </span>
+              <span class="flex w-28 items-center justify-end gap-1.5 text-xs" :class="destinationState(d.enabled, d.status.state, dash.isLive.value).text">
+                <StatusDot :color="destinationState(d.enabled, d.status.state, dash.isLive.value).dot" :pulse="destinationState(d.enabled, d.status.state, dash.isLive.value).pulse" />
+                {{ destinationState(d.enabled, d.status.state, dash.isLive.value).label }}
+              </span>
+            </li>
+          </ul>
+        </Section>
       </div>
-    </main>
-
-    <DestinationModal v-model:open="modalOpen" :editing="editing" @saved="refresh" />
-  </div>
+    </template>
+  </UDashboardPanel>
 </template>

@@ -3,4 +3,43 @@
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --ui-radius: 0.375rem;
+}
+
+/* T3-style primary: black buttons in light mode, white in dark.
+   Higher specificity than Nuxt UI's injected :root/.dark color variables. */
+html:root {
+  --ui-primary: #171717;
+}
+html.dark:root {
+  --ui-primary: #fafafa;
+}
+
+/* Near-black, neutral (not blue-tinted) dark theme */
+.dark {
+  --ui-bg: #0a0a0b;
+  --ui-bg-muted: #111113;
+  --ui-bg-elevated: #151517;
+  --ui-bg-accented: #1d1d20;
+  --ui-border: #222225;
+  --ui-border-muted: #1a1a1d;
+  --ui-border-accented: #2e2e32;
+}
+
+html {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-size: 0.875rem;
+}
+
+/* Small uppercase section labels */
+.section-label {
+  @apply text-[11px] font-medium uppercase tracking-wider text-dimmed;
 }
