@@ -1,7 +1,7 @@
 import type { ChatEvent, ChatMessage, ChatSourceStatus } from '@sp/shared'
 
 /** Live merged chat from the relay (same stream the OBS plugin reads). */
-export function useChatStream(token: Ref<string | undefined>) {
+export function useChatStream(token: Ref<string | undefined>, opts: { detached?: boolean } = {}) {
   const config = useRuntimeConfig()
   const messages = ref<ChatMessage[]>([])
   const sources = ref<ChatSourceStatus[]>([])
@@ -12,7 +12,7 @@ export function useChatStream(token: Ref<string | undefined>) {
     es?.close()
     connected.value = false
     if (!token.value) return
-    const base = config.public.chatServerUrl || location.origin
+    const base = (config.public.chatServerUrl as string) || location.origin
     es = new EventSource(`${base}/chat/events?token=${encodeURIComponent(token.value)}`)
     es.onopen = () => { connected.value = true }
     es.onerror = () => { connected.value = false }
@@ -29,8 +29,13 @@ export function useChatStream(token: Ref<string | undefined>) {
     for (const t of ['hello', 'status', 'message']) es.addEventListener(t, on as EventListener)
   }
 
-  onMounted(connect)
   watch(token, connect)
-  onBeforeUnmount(() => es?.close())
+  // Works inside a component, or detached (the Studio session lives outside pages).
+  if (opts.detached) {
+    if (import.meta.client) connect()
+  } else {
+    onMounted(connect)
+    onBeforeUnmount(() => es?.close())
+  }
   return { messages, sources, connected, reconnect: connect }
 }

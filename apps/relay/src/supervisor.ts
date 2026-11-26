@@ -28,13 +28,13 @@ const PROBE_EVERY_MS = 5 * 60_000
  * - `aresample=async` + a silent fallback keep audio continuous, so players
  *   don't stall when the browser has no microphone or drops packets.
  */
-const NORMALIZE_ARGS = [
+const normalizeArgs = (preset: string) => [
   '-fflags', '+genpts+discardcorrupt',
   '-map', '0:v:0', '-map', '0:a:0?',
   '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,fps=30,format=yuv420p',
-  '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'high', '-level', '4.1',
+  '-c:v', 'libx264', '-preset', preset, '-profile:v', 'high', '-level', '4.1',
   '-g', '60', '-keyint_min', '60', '-sc_threshold', '0', '-bf', '2', '-rc-lookahead', '15',
-  '-b:v', '6000k', '-maxrate', '6000k', '-bufsize', '6000k', '-x264-params', 'nal-hrd=cbr',
+  '-b:v', '6000k', '-maxrate', '6000k', '-bufsize', '6000k', '-x264-params', 'nal-hrd=cbr:aq-mode=3',
   '-af', 'aresample=async=1000:first_pts=0',
   '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
   '-max_muxing_queue_size', '1024',
@@ -143,10 +143,13 @@ export class Supervisor {
       let n = this.normalizers.get(c.id)
       if (needsNormalize(info)) {
         if (!n) {
-          n = new Push(`norm:${c.id}`, 0, rtspUrl(ingestPath(c.ingestKey)), rtmpUrl(normalizedPath(c.ingestKey)), [config.relaySecret, c.ingestKey], NORMALIZE_ARGS)
+          // "fast" looks clearly better but needs ~55% of a 4-core VPS; use it
+          // for the first browser stream and "veryfast" for any extra ones.
+          const preset = this.normalizers.size === 0 ? 'fast' : 'veryfast'
+          n = new Push(`norm:${c.id}`, 0, rtspUrl(ingestPath(c.ingestKey)), rtmpUrl(normalizedPath(c.ingestKey)), [config.relaySecret, c.ingestKey], normalizeArgs(preset))
           this.normalizers.set(c.id, n)
           n.start()
-          console.log(`[supervisor] normalizing browser stream (${info.sourceType}: ${info.tracks.join(', ')})`)
+          console.log(`[supervisor] normalizing browser stream (${info.sourceType}: ${info.tracks.join(', ')}) preset=${preset}`)
         }
         sourceFor.set(c.id, rtmpUrl(normalizedPath(c.ingestKey)))
       } else {

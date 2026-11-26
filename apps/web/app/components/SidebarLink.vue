@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** One sidebar row: dim by default, only the current page is highlighted. */
-defineProps<{ item: { label: string, icon: string, to: string, keys?: string[], badge?: number | null, tone?: 'warning' }, active: boolean, collapsed?: boolean }>()
+defineProps<{ item: { label: string, icon: string, to: string, keys?: string[], badge?: number | null, tone?: 'warning', live?: boolean }, active: boolean, collapsed?: boolean }>()
 </script>
 
 <template>
@@ -13,6 +13,7 @@ defineProps<{ item: { label: string, icon: string, to: string, keys?: string[], 
     >
       <UIcon :name="item.icon" class="size-4 shrink-0" :class="active ? 'text-highlighted' : 'text-dimmed group-hover:text-muted'" />
       <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+      <UiStatus v-if="item.live" tone="live" class="ml-auto" />
       <span
         v-if="!collapsed && item.badge"
         class="ml-auto min-w-5 rounded-full px-1.5 text-center text-2xs font-semibold leading-5"

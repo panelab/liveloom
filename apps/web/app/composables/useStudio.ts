@@ -22,12 +22,12 @@ export type StudioState = 'idle' | 'connecting' | 'live' | 'reconnecting'
 export type Quality = '720p' | '1080p'
 
 const QUALITY: Record<Quality, { width: number, height: number, bitrate: number }> = {
-  '720p': { width: 1280, height: 720, bitrate: 4_500_000 },
-  '1080p': { width: 1920, height: 1080, bitrate: 8_000_000 },
+  '720p': { width: 1280, height: 720, bitrate: 6_000_000 },
+  '1080p': { width: 1920, height: 1080, bitrate: 14_000_000 },
 }
 const FPS = 30
 
-export function useStudio(messages: Ref<ChatMessage[]>) {
+function createStudio(messages: Ref<ChatMessage[]>) {
   const scene = reactive<Scene>(import.meta.client ? loadScene() : structuredClone(DEFAULT_SCENE))
   watch(scene, (s) => saveScene(s), { deep: true })
 
@@ -36,6 +36,8 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
   const kbps = ref<number | null>(null)
+  /** What the browser is really sending, and what's holding it back (bandwidth / cpu / none). */
+  const sendInfo = ref<{ width: number, height: number, fps: number, codec: string, limit: string } | null>(null)
   const startedAt = ref<number | null>(null)
   const micLevel = ref(0)
   const devices = ref<{ mics: MediaDeviceInfo[], cams: MediaDeviceInfo[] }>({ mics: [], cams: [] })
@@ -95,8 +97,11 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     const W = canvas.width
     const H = canvas.height
     const now = Date.now()
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high' // resizing the canvas resets this
     fillBackground(ctx, W, H, scene.background)
 
+    for (const v of [screenVideo, cameraVideo]) if (v?.paused) void v.play().catch(() => {})
     const sv = screenVideo?.videoWidth ? screenVideo : null
     const cv = cameraVideo?.videoWidth ? cameraVideo : null
     const main = sv ?? cv
@@ -187,6 +192,10 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     if (ticker || !import.meta.client) return
     sizeCanvas()
     ctx = canvas.getContext('2d', { alpha: false })
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+    }
     // A Worker timer keeps firing in background tabs (rAF and setInterval get throttled).
     const src = 'let t;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}'
     ticker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })))
@@ -202,13 +211,30 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
 
   /* ── Sources ─────────────────────────────────────────────────────────── */
 
+  // Source <video> elements live in a hidden (but attached, "visible") box:
+  // browsers may pause detached or hidden videos in background tabs.
+  let shelf: HTMLDivElement | null = null
   function videoEl(stream: MediaStream) {
+    if (!shelf) {
+      shelf = document.createElement('div')
+      shelf.setAttribute('aria-hidden', 'true')
+      shelf.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1'
+      document.body.appendChild(shelf)
+    }
     const v = document.createElement('video')
     v.muted = true
     v.playsInline = true
+    v.autoplay = true
     v.srcObject = stream
+    v.style.cssText = 'width:2px;height:2px'
+    shelf.appendChild(v)
     void v.play().catch(() => {})
     return v
+  }
+  function dropVideo(v: HTMLVideoElement | null) {
+    if (!v) return
+    v.srcObject = null
+    v.remove()
   }
   const stopStream = (s: MediaStream | null) => s?.getTracks().forEach((t) => t.stop())
 
@@ -252,15 +278,17 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
       screenNode = null
       stopStream(screen)
       screen = null
+      dropVideo(screenVideo)
       screenVideo = null
       has.screen = has.screenAudio = false
       zoom.level = 1
       return
     }
     try {
-      const q = QUALITY[quality.value]
       screen = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: { ideal: q.width }, height: { ideal: q.height }, frameRate: { ideal: FPS, max: FPS } },
+        // Native resolution (e.g. 1440p/4K screens): the canvas scales it down with
+        // high-quality filtering, which is sharper than the browser's capture scaler.
+        video: { frameRate: { ideal: FPS, max: FPS } },
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
         // Chrome: offer "this tab" last, and let people switch what they share mid-stream.
         selfBrowserSurface: 'exclude',
@@ -288,6 +316,7 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     startLoop()
     stopStream(camera)
     camera = null
+    dropVideo(cameraVideo)
     cameraVideo = null
     has.camera = false
     if (!on) return
@@ -378,9 +407,10 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     const peer = new RTCPeerConnection({ bundlePolicy: 'max-bundle' })
     pc = peer
     const vt = peer.addTransceiver(video!, { direction: 'sendonly', sendEncodings: [{ maxBitrate: q.bitrate, maxFramerate: FPS }] })
+    const preferred = await bestCodec(q)
     const caps = RTCRtpSender.getCapabilities?.('video')?.codecs ?? []
-    const h264 = caps.filter((c) => /h264/i.test(c.mimeType))
-    if (h264.length && vt.setCodecPreferences) vt.setCodecPreferences([...h264, ...caps.filter((c) => !/h264/i.test(c.mimeType))])
+    const first = caps.filter((c) => c.mimeType.toLowerCase() === `video/${preferred}`)
+    if (first.length && vt.setCodecPreferences) vt.setCodecPreferences([...first, ...caps.filter((c) => !first.includes(c))])
     peer.addTransceiver(audio!, { direction: 'sendonly', sendEncodings: [{ maxBitrate: 160_000 }] })
 
     let disconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -423,7 +453,7 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     }
     const loc = res.headers.get('location')
     sessionUrl = loc ? new URL(loc.startsWith('/') && !loc.startsWith('/whip') ? `/whip${loc}` : loc, whipUrl).toString() : null
-    await peer.setRemoteDescription({ type: 'answer', sdp: await res.text() })
+    await peer.setRemoteDescription({ type: 'answer', sdp: withBitrateHints(await res.text(), q.bitrate) })
   }
 
   function teardownPeer() {
@@ -466,12 +496,19 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
       const stats = await pc.getStats()
       let bytes = 0
       let video = 0
+      let info: typeof sendInfo.value = null
+      const codecs = new Map<string, string>()
+      stats.forEach((r: any) => { if (r.type === 'codec') codecs.set(r.id, String(r.mimeType ?? '').replace('video/', '')) })
       stats.forEach((r: any) => {
         if (r.type === 'outbound-rtp') {
           bytes += r.bytesSent ?? 0
-          if (r.kind === 'video') video += r.bytesSent ?? 0
+          if (r.kind === 'video') {
+            video += r.bytesSent ?? 0
+            info = { width: r.frameWidth ?? 0, height: r.frameHeight ?? 0, fps: Math.round(r.framesPerSecond ?? 0), codec: codecs.get(r.codecId) ?? '', limit: r.qualityLimitationReason ?? 'none' }
+          }
         }
       })
+      sendInfo.value = info
       const now = performance.now()
       if (last.t) kbps.value = Math.round(((bytes - last.bytes) * 8) / (now - last.t))
       // Watchdog: connected but no video leaving the browser → start over.
@@ -510,6 +547,7 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     clearInterval(statsTimer)
     teardownPeer()
     kbps.value = null
+    sendInfo.value = null
     startedAt.value = null
     notice.value = null
     state.value = 'idle'
@@ -534,6 +572,20 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     } catch (e: any) {
       if (e?.name === 'AbortError') return
     }
+    // No file picker (Firefox/Safari): stream chunks into the browser's own disk
+    // storage (OPFS) instead of RAM, then hand the finished file over.
+    let opfsName: string | null = null
+    if (!writable) {
+      try {
+        const root = await navigator.storage.getDirectory()
+        opfsName = `recording-${Date.now()}.${ext}`
+        writable = await (await root.getFileHandle(opfsName, { create: true }) as any).createWritable()
+        void navigator.storage.persist?.()
+      } catch {
+        opfsName = null
+        writable = null
+      }
+    }
     const chunks: Blob[] = []
     recorder = new MediaRecorder(outputStream(), { mimeType: mimeType || undefined, videoBitsPerSecond: QUALITY[quality.value].bitrate, audioBitsPerSecond: 192_000 })
     let writing = Promise.resolve()
@@ -546,6 +598,13 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
       await writing
       if (writable) {
         await writable.close()
+        if (opfsName) {
+          const root = await navigator.storage.getDirectory()
+          const file = await (await root.getFileHandle(opfsName)).getFile()
+          const url = URL.createObjectURL(file)
+          Object.assign(document.createElement('a'), { href: url, download: name }).click()
+          setTimeout(() => { URL.revokeObjectURL(url); void root.removeEntry(opfsName!).catch(() => {}) }, 120_000)
+        }
       } else {
         const url = URL.createObjectURL(new Blob(chunks, { type: mimeType || 'video/webm' }))
         const a = Object.assign(document.createElement('a'), { href: url, download: name })
@@ -573,23 +632,98 @@ export function useStudio(messages: Ref<ChatMessage[]>) {
     clearInterval(levelTimer)
     for (const s of [screen, camera, mic]) stopStream(s)
     screen = camera = mic = null
+    dropVideo(screenVideo)
+    dropVideo(cameraVideo)
     screenVideo = cameraVideo = null
+    Object.assign(has, { screen: false, camera: false, mic: false, screenAudio: false })
+    micLevel.value = 0
     canvasTrack?.stop()
+    canvasTrack = null
     audioCtx?.close().catch(() => {})
     audioCtx = null
   }
 
-  onMounted(() => {
-    void loadDevices()
-    navigator.mediaDevices?.addEventListener?.('devicechange', loadDevices)
-  })
-  onBeforeUnmount(() => {
-    navigator.mediaDevices?.removeEventListener?.('devicechange', loadDevices)
-    release()
-  })
+  void loadDevices()
+  navigator.mediaDevices?.addEventListener?.('devicechange', loadDevices)
+  // Closing the tab: end the WHIP session cleanly so platforms stop quickly.
+  window.addEventListener('pagehide', () => { if (sessionUrl) fetch(sessionUrl, { method: 'DELETE', keepalive: true }).catch(() => {}) })
 
   return {
-    canvas, scene, quality, state, error, notice, kbps, startedAt, micLevel, devices, camId, micId, has, zoom, screenRect, recording,
-    startLoop, toggleScreen, toggleCamera, toggleMic, zoomAt, goLive, stop, startRecording, stopRecording,
+    canvas, scene, quality, state, error, notice, kbps, sendInfo, startedAt, micLevel, devices, camId, micId, has, zoom, screenRect, recording,
+    startLoop, toggleScreen, toggleCamera, toggleMic, zoomAt, goLive, stop, startRecording, stopRecording, release,
   }
+}
+
+export type Studio = ReturnType<typeof createStudio>
+const session = shallowRef<Studio | null>(null)
+
+/**
+ * One Studio per browser tab, independent of pages: it keeps streaming while
+ * you use Home, Chat or Settings, and only stops when you end it or close the tab.
+ */
+export function useStudio(): Studio {
+  if (import.meta.server) throw new Error('Studio is client-only')
+  if (!session.value) {
+    const scope = effectScope(true)
+    session.value = scope.run(() => {
+      const token = ref<string>()
+      $fetch<{ token: string }>('/api/chat').then((c) => { token.value = c.token }).catch(() => {})
+      const { messages } = useChatStream(token, { detached: true })
+      return createStudio(messages)
+    })!
+  }
+  return session.value!
+}
+
+/** The session if one exists (for the sidebar's "streaming from this tab" indicator); never creates one. */
+export function studioSession(): Studio | null {
+  return session.value
+}
+
+/**
+ * Pick the codec that gives the best picture on this computer:
+ * hardware H.264 if available (fast, good), else VP9 (much better than
+ * software H.264 at the same bitrate), else VP8. LiveLoom re-encodes for the
+ * platforms anyway, so the browser codec only has to be high quality.
+ */
+async function bestCodec(q: { width: number, height: number, bitrate: number }): Promise<string> {
+  const have = new Set((RTCRtpSender.getCapabilities?.('video')?.codecs ?? []).map((c) => c.mimeType.toLowerCase().replace('video/', '')))
+  const check = async (contentType: string) => {
+    try {
+      return await navigator.mediaCapabilities.encodingInfo({
+        type: 'webrtc',
+        video: { contentType, width: q.width, height: q.height, bitrate: q.bitrate, framerate: 30 },
+      } as any)
+    } catch {
+      return null
+    }
+  }
+  if (have.has('h264')) {
+    const h = await check('video/H264')
+    if (h?.supported && h.powerEfficient) return 'h264'
+  }
+  if (have.has('vp9')) return 'vp9'
+  if (have.has('h264')) return 'h264'
+  return 'vp8'
+}
+
+/**
+ * Chrome's congestion control starts around 300 kbps and ramps slowly, so the
+ * first seconds look blurry. These standard Chrome hints (in the answer we
+ * receive) start high and keep a sensible floor.
+ */
+function withBitrateHints(sdp: string, bitrate: number): string {
+  const max = Math.round(bitrate / 1000)
+  const start = Math.round(max * 0.6)
+  const min = Math.round(max * 0.25)
+  const lines = sdp.split('\r\n')
+  const videoStart = lines.findIndex((l) => l.startsWith('m=video'))
+  if (videoStart < 0) return sdp
+  const pts = (lines[videoStart]!.split(' ').slice(3))
+  return lines.map((l, i) => {
+    if (i <= videoStart || !l.startsWith('a=fmtp:')) return l
+    const pt = l.slice(7).split(' ')[0]!
+    if (!pts.includes(pt) || /apt=/.test(l) || l.includes('x-google-')) return l
+    return `${l};x-google-start-bitrate=${start};x-google-min-bitrate=${min};x-google-max-bitrate=${max}`
+  }).join('\r\n')
 }

@@ -6,15 +6,20 @@ const route = useRoute()
 const dialog = useDestinationDialog()
 const commandOpen = useState('command-open', () => false)
 
-interface NavItem { label: string, icon: string, to: string, keys?: string[], badge?: number | null, tone?: 'warning' }
+interface NavItem { label: string, icon: string, to: string, keys?: string[], badge?: number | null, tone?: 'warning', live?: boolean }
+
+// Browser stream running in this tab (keeps going while you use other pages).
+const studioState = computed(() => (import.meta.client ? studioSession()?.state.value ?? 'idle' : 'idle'))
+const studioRecording = computed(() => (import.meta.client ? !!studioSession()?.recording.value : false))
+const studioOn = computed(() => studioState.value !== 'idle' || studioRecording.value)
 const primary = computed<NavItem[]>(() => [
   { label: 'Home', icon: 'i-lucide-house', to: '/', keys: ['G', 'H'], badge: dash.issues.value.length || null, tone: 'warning' },
   { label: 'Chat', icon: 'i-lucide-messages-square', to: '/chat', keys: ['G', 'C'] },
 ])
-const goLive: NavItem[] = [
+const goLive = computed<NavItem[]>(() => [
   { label: 'With OBS', icon: 'i-simple-icons-obsstudio', to: '/setup', keys: ['G', 'O'] },
-  { label: 'From browser', icon: 'i-lucide-monitor-up', to: '/studio', keys: ['G', 'B'] },
-]
+  { label: 'From browser', icon: 'i-lucide-monitor-up', to: '/studio', keys: ['G', 'B'], live: studioOn.value },
+])
 const secondary: NavItem[] = [
   { label: 'Settings', icon: 'i-lucide-settings', to: '/settings', keys: ['G', 'S'] },
 ]
@@ -116,6 +121,17 @@ defineShortcuts({
     </UDashboardSidebar>
 
     <slot />
+
+    <!-- Browser stream keeps running on other pages: always show a way back -->
+    <NuxtLink
+      v-if="studioOn && route.path !== '/studio'"
+      to="/studio"
+      class="surface-raised fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-highlighted"
+    >
+      <UiStatus :tone="studioState === 'live' ? 'live' : studioState === 'idle' ? 'error' : 'warning'" />
+      {{ studioState === 'live' ? 'Live from this tab' : studioState === 'idle' ? 'Recording in this tab' : 'Reconnecting…' }}
+      <span class="text-muted">· Open Studio</span>
+    </NuxtLink>
 
     <CommandMenu v-model:open="commandOpen" />
     <DestinationModal />
