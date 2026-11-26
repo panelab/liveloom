@@ -11,7 +11,7 @@ const Body = z.object({
 
 export default defineEventHandler(async (event) => {
   const { channel, db } = await requireChannel(event)
-  const body = await readValidatedBody(event, Body.parse)
+  const body = await parseBody(event, Body)
   const [row] = await db.insert(destinations).values({
     channelId: channel.id,
     platform: body.platform,

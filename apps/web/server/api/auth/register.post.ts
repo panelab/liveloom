@@ -8,7 +8,7 @@ const Body = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  const { email, password } = await readValidatedBody(event, Body.parse)
+  const { email, password } = await parseBody(event, Body)
   const db = useDb(event)
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
   if (existing) throw createError({ statusCode: 409, message: 'An account with this email already exists' })

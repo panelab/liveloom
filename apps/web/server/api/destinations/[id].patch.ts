@@ -13,7 +13,7 @@ const Body = z.object({
 export default defineEventHandler(async (event) => {
   const { channel, db } = await requireChannel(event)
   const id = getRouterParam(event, 'id')!
-  const body = await readValidatedBody(event, Body.parse)
+  const body = await parseBody(event, Body)
 
   const set: Partial<typeof destinations.$inferInsert> = { updatedAt: new Date() }
   if (body.name !== undefined) set.name = body.name
