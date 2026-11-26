@@ -14,6 +14,38 @@ Dashboard (Nuxt) ──► Turso/libSQL ◄── relay reads destinations, writ
 
 The relay copies the stream without re-encoding, so CPU use stays close to zero. Your upload bandwidth is only spent once.
 
+## Multichat for OBS
+
+A native OBS plugin that merges **Twitch, Kick and YouTube chat** into one feed, with each message tagged by its platform's icon.
+
+<p align="center">
+  <img src="docs/images/obs-multichat.png" width="380" alt="The Multichat dock in OBS showing YouTube and Kick messages merged into one feed, with the Multichat source in the Sources list">
+</p>
+
+- **Multichat dock**: read chat from every platform on your monitor, inside OBS.
+- **Multichat source**: show chat on stream. Font, colors, background, platform icons, platform filters and fade-out are all configurable.
+- Usernames keep their platform colors, and emotes appear as images.
+- Needs no platform logins or API keys: LiveLoom reads chat on the server and streams it to the plugin.
+
+### Install
+
+Download the file for your OS from the [latest release](https://github.com/panelab/liveloom/releases):
+
+| OS | File | Install |
+|---|---|---|
+| Windows | `obs-multichat-*-windows-x64.zip` | Extract into `C:\ProgramData\obs-studio\plugins\` |
+| macOS | `obs-multichat-*-macos-universal.pkg` | Run the installer. The first time, right-click it and choose **Open**. |
+| Linux (Ubuntu/Debian) | `obs-multichat-*-x86_64-linux-gnu.deb` | `sudo apt install ./obs-multichat-*.deb` |
+
+Requires OBS 30 or newer. Then:
+
+1. In the LiveLoom dashboard, open **Chat** and enter your Twitch username, Kick username and YouTube @handle.
+2. Open **Setup** and copy the **Plugin token**.
+3. Restart OBS, click **⚙** in the Multichat dock, and paste the token.
+4. To show chat on stream, add **Sources → + → Multichat** to a scene.
+
+Source code and build instructions: [`plugins/obs-multichat`](plugins/obs-multichat).
+
 ## Monorepo
 
 Bun workspaces + Turborepo.
@@ -21,10 +53,11 @@ Bun workspaces + Turborepo.
 | Path | What | Runs on |
 |---|---|---|
 | `apps/web` | Nuxt 4 + Nuxt UI dashboard and API (auth, destinations, status) | **VPS (Bun) or Cloudflare Workers** |
-| `apps/relay` | Bun service: MediaMTX auth hook, supervises FFmpeg pushes, reconnects with backoff | **VPS only** (needs FFmpeg + long-lived processes) |
+| `apps/relay` | Bun service: MediaMTX auth hook, supervises FFmpeg pushes with reconnect backoff, merged chat over SSE | **VPS only** (needs FFmpeg + long-lived processes) |
 | `packages/db` | Drizzle ORM schema + libSQL client, migrations | shared |
 | `packages/shared` | Platform presets, AES-GCM key encryption (Web Crypto) | shared |
-| `infra/` | MediaMTX config, dev compose | |
+| `plugins/obs-multichat` | Multichat OBS plugin (C++/Qt): chat dock and on-stream source | Windows, macOS, Linux (built by GitHub Actions) |
+| `infra/` | MediaMTX config, Caddy, dev compose | |
 
 The web app only reads from and writes to the database. It never talks to the relay directly, which is why it can run anywhere.
 
@@ -102,7 +135,8 @@ To use Turso cloud instead of the bundled libSQL server, set `DATABASE_URL_DOCKE
 
 ## Roadmap ideas
 
-- Unified chat (Twitch IRC + YouTube Live Chat API + Kick)
+- Reply to chat from the OBS dock
+- Facebook, TikTok and X chat
 - YouTube/Twitch OAuth to set titles and create broadcasts automatically
 - Vertical 9:16 output for TikTok/Shorts (needs transcoding)
 - Browser streaming via WebRTC/WHIP (MediaMTX supports it)

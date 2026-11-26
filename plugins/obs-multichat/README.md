@@ -2,6 +2,10 @@
 
 Native OBS plugin (C++/Qt) that shows **Twitch, Kick and YouTube chat merged into one feed**, each message tagged with its platform icon.
 
+<p align="center">
+  <img src="../../docs/images/obs-multichat.png" width="380" alt="The Multichat dock in OBS showing YouTube and Kick messages merged into one feed">
+</p>
+
 - **Multichat dock**: chat on your monitor, inside OBS. Opens the first time; afterwards use **Docks → Multichat**.
 - **Multichat source**: chat on stream. Add it with **Sources → + → Multichat**. Font, colors, background, icons, platform filters, and "hide messages after N seconds" are in its properties.
 
