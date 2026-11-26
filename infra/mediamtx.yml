@@ -1,7 +1,8 @@
 # MediaMTX: receives the streamer's single upload.
-# OBS → rtmp://<host>:1935/live/<ingest key>     (or SRT on :8890)
+#   OBS     → rtmp://<host>:1935/live/<ingest key>        (or SRT on :8890)
+#   Browser → https://<host>/whip/live/<ingest key>/whip  (WebRTC/WHIP, via Caddy → :8889)
 # Every connection is checked by the relay's /mediamtx/auth hook:
-#   publish → ingest key must exist in the DB
+#   publish  → ingest key must exist in the DB
 #   read/api → only the relay (user "relay" + RELAY_SECRET)
 
 logLevel: info
@@ -20,14 +21,27 @@ rtmpAddress: :1935
 srt: yes
 srtAddress: :8890
 
-rtsp: no
-hls: no
-webrtc: no
-moq: no
+# Internal only (not published by Docker): the relay reads browser streams
+# over RTSP because RTMP can't carry Opus audio.
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
 
-pathDefaults:
-  # Drop the publisher if no data for a while (dead OBS connection)
-  sourceOnDemand: no
+# Browser streaming (WHIP). Caddy terminates TLS and proxies /whip/* here.
+# Media flows over UDP 8189 (TCP 8189 as a fallback for strict networks).
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcAllowOrigins: ['*']
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+# The container's own IPs aren't reachable from the internet; advertise the
+# public host instead (MTX_WEBRTCADDITIONALHOSTS in docker-compose).
+webrtcIPsFromInterfaces: no
+webrtcAdditionalHosts: []
+
+hls: no
+moq: no
 
 paths:
   all_others:

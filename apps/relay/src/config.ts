@@ -13,6 +13,7 @@ export const config = {
   relaySecret: req('RELAY_SECRET'),
   mediamtxApi: (process.env.MEDIAMTX_API_URL ?? 'http://127.0.0.1:9997').replace(/\/$/, ''),
   mediamtxRtmp: (process.env.MEDIAMTX_RTMP_URL ?? 'rtmp://127.0.0.1:1935').replace(/\/$/, ''),
+  mediamtxRtsp: (process.env.MEDIAMTX_RTSP_URL ?? 'rtsp://127.0.0.1:8554').replace(/\/$/, ''),
   tickMs: 2000,
   ffmpegPath: process.env.FFMPEG_PATH ?? 'ffmpeg',
 }

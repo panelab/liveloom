@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** Stream health: what the relay measured and exactly what to change in OBS. */
+const props = defineProps<{ compact?: boolean }>()
 const dash = useDashboard()
 const h = computed(() => dash.health.value)
 const facts = computed(() => {
@@ -17,7 +18,7 @@ const checkedAgo = computed(() => (h.value ? Math.max(0, Math.round((dash.now.va
 </script>
 
 <template>
-  <UiPanel title="Stream health" description="LiveLoom checks what OBS sends against every platform you stream to.">
+  <UiPanel title="Stream health" :description="props.compact ? undefined : 'LiveLoom checks what you send against every platform you stream to.'">
     <template #actions>
       <span v-if="checkedAgo !== null" class="text-xs text-dimmed">Checked {{ checkedAgo < 60 ? `${checkedAgo}s` : `${Math.round(checkedAgo / 60)}m` }} ago</span>
     </template>
@@ -31,8 +32,11 @@ const checkedAgo = computed(() => (h.value ? Math.max(0, Math.round((dash.now.va
       Measuring your stream…
     </div>
     <div v-else class="space-y-4">
-      <dl class="grid grid-cols-2 overflow-hidden rounded-md border border-default sm:grid-cols-5 sm:divide-x divide-default">
-        <div v-for="f in facts" :key="f.k" class="px-3 py-2">
+      <dl
+        class="grid overflow-hidden rounded-md border border-default divide-default"
+        :class="props.compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-5 sm:divide-x'"
+      >
+        <div v-for="f in facts" :key="f.k" class="px-3 py-2" :class="props.compact && f.k === 'Codecs' && 'col-span-2'">
           <dt class="text-2xs text-dimmed">{{ f.k }}</dt>
           <dd class="font-mono text-xs text-highlighted">{{ f.v }}</dd>
         </div>

@@ -17,6 +17,11 @@
 		}
 	}
 
+	# Browser streaming (WebRTC WHIP) → MediaMTX
+	handle_path /whip/* {
+		reverse_proxy mediamtx:8889
+	}
+
 	handle {
 		encode zstd gzip
 		reverse_proxy web:3000

@@ -13,6 +13,7 @@ const nav = computed<NavigationMenuItem[]>(() => [
     to: '/destinations',
     badge: dash.destinations.value.length ? { label: String(dash.destinations.value.length), variant: 'subtle', color: 'neutral' } : undefined,
   },
+  { label: 'Studio', icon: 'i-lucide-clapperboard', to: '/studio' },
   { label: 'Chat', icon: 'i-lucide-messages-square', to: '/chat' },
   {
     label: 'Setup',

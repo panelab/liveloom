@@ -2,7 +2,7 @@ import { and, channels, destinations, destinationStatus, eq, inArray, sql, type 
 import { decryptSecret, healthIssues, pushUrl, type IngestHealth, type PlatformId } from '@sp/shared'
 import { probeIngest } from './health'
 import { config } from './config'
-import { inputUrl, livePaths } from './mediamtx'
+import { ingestPath, livePaths, needsNormalize, normalizedPath, rtmpUrl, rtspUrl, type LivePath } from './mediamtx'
 import { Push } from './push'
 
 /**
@@ -15,8 +15,22 @@ export type HealthListener = (channelId: string, live: boolean, issues: ReturnTy
 const PROBE_FIRST_MS = 8_000
 const PROBE_EVERY_MS = 5 * 60_000
 
+/**
+ * Browser (WebRTC) streams → H.264 High, 2 s keyframes at 30 fps, AAC 48 kHz.
+ * One encode per channel, shared by every destination.
+ */
+const NORMALIZE_ARGS = [
+  '-map', '0:v:0', '-map', '0:a:0?',
+  '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
+  '-r', '30', '-g', '60', '-keyint_min', '60', '-sc_threshold', '0',
+  '-b:v', '4500k', '-maxrate', '4500k', '-bufsize', '9000k',
+  '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+]
+
 export class Supervisor {
   private pushes = new Map<string, Push>()
+  /** channelId → normalizer for browser streams */
+  private normalizers = new Map<string, Push>()
   /** channelId → next probe time (only for live channels) */
   private probes = new Map<string, number>()
   private probing = new Set<string>()
@@ -38,6 +52,8 @@ export class Supervisor {
     const ids = [...this.pushes.keys()]
     for (const p of this.pushes.values()) p.stop()
     this.pushes.clear()
+    for (const n of this.normalizers.values()) n.stop()
+    this.normalizers.clear()
     if (ids.length) await this.writeIdle(ids)
     await this.db.update(channels).set({ isLive: false, liveSince: null }).where(eq(channels.isLive, true))
   }
@@ -55,7 +71,7 @@ export class Supervisor {
   }
 
   private async reconcile() {
-    let live: Set<string>
+    let live: Map<string, LivePath>
     try {
       live = await livePaths()
       if (this.mediamtxDown) console.log('[supervisor] MediaMTX reachable again')
@@ -65,7 +81,8 @@ export class Supervisor {
       this.mediamtxDown = true
       return
     }
-    const liveKeys = [...live].filter((p) => p.startsWith('live/')).map((p) => p.slice(5))
+    // Top-level ingest paths only ("live/<key>"), not the relay's own "live/<key>/out".
+    const liveKeys = [...live.keys()].filter((p) => /^live\/[A-Za-z0-9_-]+$/.test(p)).map((p) => p.slice(5))
 
     // 1. Sync channel live flags.
     const liveChannels = liveKeys.length
@@ -92,6 +109,34 @@ export class Supervisor {
       .set({ isLive: false, liveSince: null, updatedAt: now })
       .where(and(eq(channels.isLive, true), liveIds.length ? sql`${channels.id} NOT IN ${liveIds}` : sql`1=1`))
 
+    // 1b. Browser streams get one normalizer each; destinations read its output.
+    const sourceFor = new Map<string, string>() // channelId → RTMP input URL for pushes
+    for (const c of liveChannels) {
+      const info = live.get(ingestPath(c.ingestKey))!
+      let n = this.normalizers.get(c.id)
+      if (needsNormalize(info)) {
+        if (!n) {
+          n = new Push(`norm:${c.id}`, 0, rtspUrl(ingestPath(c.ingestKey)), rtmpUrl(normalizedPath(c.ingestKey)), [config.relaySecret, c.ingestKey], NORMALIZE_ARGS)
+          this.normalizers.set(c.id, n)
+          n.start()
+          console.log(`[supervisor] normalizing browser stream (${info.sourceType}: ${info.tracks.join(', ')})`)
+        }
+        sourceFor.set(c.id, rtmpUrl(normalizedPath(c.ingestKey)))
+      } else {
+        if (n) {
+          n.stop()
+          this.normalizers.delete(c.id)
+        }
+        sourceFor.set(c.id, rtmpUrl(ingestPath(c.ingestKey)))
+      }
+    }
+    for (const [id, n] of this.normalizers) {
+      if (!liveIds.includes(id)) {
+        n.stop()
+        this.normalizers.delete(id)
+      }
+    }
+
     // 2. Desired pushes = enabled destinations of live channels.
     const wanted = liveIds.length
       ? await this.db
@@ -115,11 +160,12 @@ export class Supervisor {
     // 4. Start new pushes / restart edited ones.
     for (const { d, ingestKey } of wanted) {
       const version = d.updatedAt.getTime()
+      const input = sourceFor.get(d.channelId)!
       const existing = this.pushes.get(d.id)
-      if (existing && existing.version === version) continue
+      if (existing && existing.version === version && existing.input === input) continue
       existing?.stop()
       const key = await decryptSecret(d.streamKeyEnc, config.encryptionKey)
-      const p = new Push(d.id, version, inputUrl(ingestKey), pushUrl(d.serverUrl, key), [key, config.relaySecret])
+      const p = new Push(d.id, version, input, pushUrl(d.serverUrl, key), [key, config.relaySecret, ingestKey])
       this.pushes.set(d.id, p)
       p.start()
       console.log(`[supervisor] start push → ${d.platform} (${d.name})`)
@@ -131,7 +177,7 @@ export class Supervisor {
       if (Date.now() < due || this.probing.has(c.id)) continue
       this.probes.set(c.id, Date.now() + PROBE_EVERY_MS)
       const platforms = wanted.filter((w) => w.d.channelId === c.id).map((w) => w.d.platform as PlatformId)
-      void this.probe(c.id, c.ingestKey, platforms)
+      void this.probe(c.id, sourceFor.get(c.id)!, platforms)
     }
 
     // 5. Publish status.
@@ -157,10 +203,10 @@ export class Supervisor {
       ))
   }
 
-  private async probe(channelId: string, ingestKey: string, platforms: PlatformId[]) {
+  private async probe(channelId: string, input: string, platforms: PlatformId[]) {
     this.probing.add(channelId)
     try {
-      const h = await probeIngest(inputUrl(ingestKey))
+      const h = await probeIngest(input)
       if (!h || !this.probes.has(channelId)) return
       this.health.set(channelId, h)
       await this.db.update(channels).set({ ingestHealth: JSON.stringify(h) }).where(eq(channels.id, channelId))

@@ -27,10 +27,12 @@ export class Push {
     readonly destinationId: string,
     /** Changes when the destination is edited; caller restarts on mismatch. */
     readonly version: number,
-    private readonly input: string,
+    readonly input: string,
     private readonly output: string,
     /** Strings that must never appear in logs/status (stream key). */
     private readonly secrets: string[],
+    /** Codec/mapping args; default copies every stream unchanged. */
+    private readonly codecArgs: string[] = ['-map', '0', '-c', 'copy'],
   ) {}
 
   start() {
@@ -65,9 +67,9 @@ export class Push {
       [
         config.ffmpegPath, '-hide_banner', '-loglevel', 'error', '-nostats',
         '-progress', 'pipe:1',
-        '-rw_timeout', '15000000',
+        ...(this.input.startsWith('rtsp:') ? ['-rtsp_transport', 'tcp', '-timeout', '15000000'] : ['-rw_timeout', '15000000']),
         '-i', this.input,
-        '-map', '0', '-c', 'copy',
+        ...this.codecArgs,
         '-f', 'flv', '-flvflags', 'no_duration_filesize',
         this.output,
       ],

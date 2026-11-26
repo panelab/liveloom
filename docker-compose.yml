@@ -2,7 +2,7 @@
 #   cp .env.example .env   # fill in secrets, DOMAIN, NUXT_PUBLIC_INGEST_URL
 #   docker compose up -d --build
 # Caddy serves https://$DOMAIN (auto Let's Encrypt). Needs DNS A record → this
-# machine and ports 80, 443 (tcp+udp), 1935/tcp, 8890/udp open.
+# machine and ports 80, 443 (tcp+udp), 1935/tcp, 8890/udp, 8189 (udp+tcp) open.
 #
 # Using Turso cloud instead of the bundled libSQL server? Set DATABASE_URL /
 # DATABASE_AUTH_TOKEN in .env and run: docker compose up -d --build mediamtx relay web
@@ -25,10 +25,14 @@ services:
     ports:
       - "1935:1935"      # RTMP ingest (OBS)
       - "8890:8890/udp"  # SRT ingest
+      - "8189:8189/udp"  # WebRTC media (browser streaming)
+      - "8189:8189/tcp"  # WebRTC media, TCP fallback
     volumes:
       - ./infra/mediamtx.yml:/mediamtx.yml:ro
     environment:
       MTX_AUTHHTTPADDRESS: http://relay:8787/mediamtx/auth
+      # Public IP or hostname browsers should send WebRTC media to
+      MTX_WEBRTCADDITIONALHOSTS: ${WEBRTC_PUBLIC_HOST:-${DOMAIN}}
     restart: unless-stopped
 
   relay:
@@ -39,6 +43,7 @@ services:
       HOST: 0.0.0.0
       MEDIAMTX_API_URL: http://mediamtx:9997
       MEDIAMTX_RTMP_URL: rtmp://mediamtx:1935
+      MEDIAMTX_RTSP_URL: rtsp://mediamtx:8554
     depends_on: [mediamtx]
     restart: unless-stopped
 

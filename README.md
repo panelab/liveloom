@@ -5,8 +5,9 @@
 Stream once from OBS and go live on YouTube, Twitch, Kick, Facebook, TikTok, X and any other RTMP platform at the same time.
 
 ```
-OBS ──(1 upload)──► MediaMTX ──► relay (FFmpeg -c copy) ──┬──► YouTube
-   rtmp://host/live/<key>        one process per platform  ├──► Twitch
+OBS ─────(RTMP)──┐
+Browser ─(WHIP)──┴─► MediaMTX ──► relay (FFmpeg -c copy) ──┬──► YouTube
+                                 one process per platform   ├──► Twitch
                                                            ├──► Kick
                                                            └──► …
 Dashboard (Nuxt) ──► Turso/libSQL ◄── relay reads destinations, writes live status
@@ -18,6 +19,7 @@ The relay copies the stream without re-encoding, so CPU use stays close to zero.
 - **Connect with YouTube, Twitch and Kick:** sign in once and LiveLoom fetches your stream keys, server URLs and chat channels. See [docs/connect-apps.md](docs/connect-apps.md).
 - **One-click OBS setup:** the Multichat plugin signs in with a short code and fills in OBS's stream server, key, keyframe interval and bitrate.
 - **Stream health checks:** a few seconds after you go live, LiveLoom measures what OBS sends (resolution, frame rate, keyframes, bitrate, codecs) and tells you the exact OBS setting to change for each platform you're streaming to, both in the dashboard and in the OBS dock.
+- **Go live from the browser (Studio):** share your screen, camera, or screen with a camera bubble, plus your mic, over WebRTC (WHIP). No OBS needed. LiveLoom converts it to H.264/AAC with 2 s keyframes once, then sends it to every platform.
 - **Merged chat** from Twitch, Kick and YouTube in the dashboard and in OBS.
 - Open source and self-hosted: no watermark, no destination limit, and your keys stay on your server.
 
@@ -117,7 +119,7 @@ This runs libSQL (sqld), MediaMTX, the relay, the web app, and **Caddy**, which 
 
 Checklist:
 1. **DNS**: create an `A` record for `$DOMAIN` pointing to the server's public IP. On Cloudflare, set it to **DNS only (grey cloud)**, because Cloudflare's proxy doesn't pass RTMP on port 1935.
-2. **Cloud firewall** (for example an Oracle Cloud Security List): allow ingress on 80/tcp, 443/tcp, 443/udp, 1935/tcp and 8890/udp.
+2. **Cloud firewall** (for example an Oracle Cloud Security List): allow ingress on 80/tcp, 443/tcp, 443/udp, 1935/tcp, 8890/udp and 8189/udp+tcp.
 3. **Host firewall**: Oracle's Ubuntu images reject everything except SSH. Add `ACCEPT` rules for the same ports before the `REJECT` line in `/etc/iptables/rules.v4`.
 4. On Oracle, use a **Reserved** public IP so the address survives an instance stop or start.
 
@@ -149,5 +151,4 @@ To use Turso cloud instead of the bundled libSQL server, set `DATABASE_URL_DOCKE
 - Facebook, TikTok and X chat
 - YouTube/Twitch OAuth to set titles and create broadcasts automatically
 - Vertical 9:16 output for TikTok/Shorts (needs transcoding)
-- Browser streaming via WebRTC/WHIP (MediaMTX supports it)
 - Multiple channels per user, teams
