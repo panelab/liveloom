@@ -15,6 +15,13 @@
       "when": 1795669350050,
       "tag": "0001_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795675099750,
+      "tag": "0002_connect_device_health",
+      "breakpoints": true
     }
   ]
 }

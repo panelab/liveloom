@@ -5,17 +5,25 @@ const dash = useDashboard()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { refresh: refreshConnections } = await useConnections()
 
 const modalOpen = ref(false)
 const editing = ref<DestinationView | null>(null)
 function openAdd() { editing.value = null; modalOpen.value = true }
 function openEdit(d: DestinationView) { editing.value = d; modalOpen.value = true }
 
+const connectError = ref<string | null>(null)
 onMounted(() => {
-  if (route.query.add) {
-    openAdd()
-    router.replace({ query: {} })
+  const q = route.query
+  if (q.add) openAdd()
+  if (q.connected) {
+    const name = { youtube: 'YouTube', twitch: 'Twitch', kick: 'Kick' }[String(q.connected)] ?? String(q.connected)
+    toast.add({ title: `${name} connected`, description: 'Your destination and chat are ready.', icon: 'i-lucide-check', color: 'success' })
+    refreshConnections()
+    dash.refresh()
   }
+  if (q.connect_error) connectError.value = String(q.connect_error)
+  if (q.add || q.connected || q.connect_error) router.replace({ query: {} })
 })
 
 async function toggle(d: DestinationView, enabled: boolean) {
@@ -44,76 +52,86 @@ function rowMenu(d: DestinationView) {
 <template>
   <UDashboardPanel id="destinations">
     <template #header>
-      <UDashboardNavbar title="Destinations" :ui="{ root: 'h-12' }">
+      <UDashboardNavbar title="Destinations" :ui="{ root: 'h-14' }">
         <template #right>
-          <UButton label="Add destination" icon="i-lucide-plus" @click="openAdd" />
+          <UButton label="Add manually" icon="i-lucide-plus" variant="outline" color="neutral" @click="openAdd" />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
-      <div class="mx-auto w-full max-w-5xl space-y-4">
-        <p class="text-sm text-muted">
-          OBS uploads once to LiveLoom; each enabled destination gets a copy. Toggle one off to stop sending to it, even mid-stream.
-        </p>
+      <div class="mx-auto w-full max-w-5xl space-y-6">
+        <UiPageIntro
+          title="Destinations"
+          description="OBS uploads once to LiveLoom, and each enabled destination gets a copy. Turn one off to stop sending to it, even mid-stream."
+        />
 
-        <div v-if="dash.pending.value" class="space-y-2">
-          <USkeleton v-for="i in 3" :key="i" class="h-14" />
-        </div>
+        <UiCallout v-if="connectError" tone="error" title="Couldn’t connect" :description="connectError">
+          <template #actions>
+            <UButton icon="i-lucide-x" variant="ghost" color="neutral" size="xs" aria-label="Dismiss" @click="connectError = null" />
+          </template>
+        </UiCallout>
 
-        <div v-else-if="!dash.destinations.value.length" class="rounded-lg border border-dashed border-default py-10">
+        <ConnectPanel />
+
+        <UiPanel title="All destinations" flush>
+          <div v-if="dash.pending.value" class="space-y-2 p-4">
+            <USkeleton v-for="i in 3" :key="i" class="h-12" />
+          </div>
           <UEmpty
+            v-else-if="!dash.destinations.value.length"
             icon="i-lucide-radio-tower"
             title="No destinations yet"
-            description="Add the platforms you want to go live on. You'll need each platform's stream key."
-            :actions="[{ label: 'Add destination', icon: 'i-lucide-plus', onClick: openAdd }]"
+            description="Connect an account above, or add any RTMP server manually."
+            :actions="[{ label: 'Add manually', icon: 'i-lucide-plus', variant: 'outline', color: 'neutral', onClick: openAdd }]"
             variant="naked"
+            class="py-10"
           />
-        </div>
-
-        <div v-else class="overflow-hidden rounded-lg border border-default">
-          <div class="hidden md:grid grid-cols-[1fr_9rem_7rem_6rem_5.5rem] gap-4 border-b border-default bg-elevated/40 px-4 py-2 section-label">
-            <span>Destination</span><span>Status</span><span class="text-right">Bitrate</span><span class="text-right">Uptime</span><span class="text-right">Enabled</span>
-          </div>
-          <ul class="divide-y divide-default">
-            <li
-              v-for="d in dash.destinations.value"
-              :key="d.id"
-              class="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_9rem_7rem_6rem_5.5rem] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-elevated/30"
-            >
-              <div class="flex min-w-0 items-center gap-3">
-                <div class="grid size-8 shrink-0 place-items-center rounded-md border border-default bg-muted">
-                  <UIcon :name="platformIcon[d.platform] ?? platformIcon.custom" class="size-4" :style="{ color: platformColor[d.platform] }" />
+          <template v-else>
+            <div class="hidden grid-cols-[1fr_8rem_6rem_5rem_5rem] gap-4 border-b border-default px-4 py-2 label-caps md:grid">
+              <span>Destination</span><span>Status</span><span class="text-right">Bitrate</span><span class="text-right">Uptime</span><span class="text-right">On</span>
+            </div>
+            <ul class="divide-y divide-default">
+              <li
+                v-for="d in dash.destinations.value"
+                :key="d.id"
+                class="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-elevated/40 md:grid-cols-[1fr_8rem_6rem_5rem_5rem]"
+              >
+                <div class="flex min-w-0 items-center gap-3">
+                  <UiPlatformIcon :platform="d.platform" tile />
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <button class="truncate text-left text-sm font-medium text-highlighted hover:underline" @click="openEdit(d)">{{ d.name }}</button>
+                      <UTooltip v-if="d.connected" text="Managed by a connected account">
+                        <UIcon name="i-lucide-link" class="size-3 text-dimmed" />
+                      </UTooltip>
+                    </div>
+                    <p class="truncate font-mono text-xs text-dimmed">{{ d.serverUrl }} · {{ d.streamKeyHint }}</p>
+                  </div>
                 </div>
-                <div class="min-w-0">
-                  <button class="block truncate text-sm font-medium text-highlighted hover:underline text-left" @click="openEdit(d)">{{ d.name }}</button>
-                  <p class="truncate font-mono text-xs text-dimmed">{{ d.serverUrl }} · {{ d.streamKeyHint }}</p>
+                <div class="col-start-1 flex items-center gap-1.5 md:col-start-auto">
+                  <UiStatus v-bind="destinationStatus(d.enabled, d.status.state, dash.isLive.value)" />
+                  <UTooltip v-if="d.enabled && d.status.message" :text="d.status.message">
+                    <UIcon name="i-lucide-info" class="size-3.5 text-dimmed" />
+                  </UTooltip>
                 </div>
-              </div>
-
-              <div class="col-start-1 md:col-start-auto flex items-center gap-1.5 text-xs" :class="destinationState(d.enabled, d.status.state, dash.isLive.value).text">
-                <StatusDot :color="destinationState(d.enabled, d.status.state, dash.isLive.value).dot" :pulse="destinationState(d.enabled, d.status.state, dash.isLive.value).pulse" />
-                {{ destinationState(d.enabled, d.status.state, dash.isLive.value).label }}
-                <UTooltip v-if="d.enabled && d.status.message" :text="d.status.message">
-                  <UIcon name="i-lucide-info" class="size-3.5 text-dimmed" />
-                </UTooltip>
-              </div>
-              <span class="hidden md:block text-right font-mono text-xs tabular-nums text-muted">
-                {{ d.enabled && d.status.state === 'live' ? formatKbps(d.status.bitrateKbps) : '—' }}
-              </span>
-              <span class="hidden md:block text-right font-mono text-xs tabular-nums text-muted">
-                {{ d.enabled && d.status.startedAt ? formatDuration(dash.now.value - d.status.startedAt) : '—' }}
-              </span>
-              <div class="row-start-1 col-start-2 md:row-start-auto md:col-start-auto flex items-center justify-end gap-1">
-                <USwitch :model-value="d.enabled" size="sm" :aria-label="`Toggle ${d.name}`" @update:model-value="(v: boolean) => toggle(d, v)" />
-                <UDropdownMenu :items="rowMenu(d)" :content="{ align: 'end' }">
-                  <UButton icon="i-lucide-ellipsis" variant="ghost" color="neutral" size="xs" aria-label="More" />
-                </UDropdownMenu>
-              </div>
-              <p v-if="d.enabled && d.status.message && d.status.state !== 'live'" class="col-span-full md:hidden text-xs text-error break-words">{{ d.status.message }}</p>
-            </li>
-          </ul>
-        </div>
+                <span class="hidden text-right font-mono text-xs tabular-nums text-muted md:block">
+                  {{ d.enabled && d.status.state === 'live' ? formatKbps(d.status.bitrateKbps) : '—' }}
+                </span>
+                <span class="hidden text-right font-mono text-xs tabular-nums text-muted md:block">
+                  {{ d.enabled && d.status.startedAt ? formatDuration(dash.now.value - d.status.startedAt) : '—' }}
+                </span>
+                <div class="col-start-2 row-start-1 flex items-center justify-end gap-1 md:col-start-auto md:row-start-auto">
+                  <USwitch :model-value="d.enabled" size="sm" :aria-label="`Send to ${d.name}`" @update:model-value="(v: boolean) => toggle(d, v)" />
+                  <UDropdownMenu :items="rowMenu(d)" :content="{ align: 'end' }">
+                    <UButton icon="i-lucide-ellipsis" variant="ghost" color="neutral" size="xs" :aria-label="`${d.name} options`" />
+                  </UDropdownMenu>
+                </div>
+                <p v-if="d.enabled && d.status.message && d.status.state !== 'live'" class="col-span-full break-words text-xs text-error md:hidden">{{ d.status.message }}</p>
+              </li>
+            </ul>
+          </template>
+        </UiPanel>
       </div>
 
       <DestinationModal v-model:open="modalOpen" :editing="editing" @saved="dash.refresh()" />

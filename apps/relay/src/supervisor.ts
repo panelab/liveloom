@@ -1,5 +1,6 @@
 import { and, channels, destinations, destinationStatus, eq, inArray, sql, type Db } from '@sp/db'
-import { decryptSecret, pushUrl } from '@sp/shared'
+import { decryptSecret, healthIssues, pushUrl, type IngestHealth, type PlatformId } from '@sp/shared'
+import { probeIngest } from './health'
 import { config } from './config'
 import { inputUrl, livePaths } from './mediamtx'
 import { Push } from './push'
@@ -9,8 +10,18 @@ import { Push } from './push'
  * processes). The web app only ever writes to the DB, so it can run anywhere
  * (Cloudflare, VPS) without talking to the relay directly.
  */
+export type HealthListener = (channelId: string, live: boolean, issues: ReturnType<typeof healthIssues>) => void
+
+const PROBE_FIRST_MS = 8_000
+const PROBE_EVERY_MS = 5 * 60_000
+
 export class Supervisor {
   private pushes = new Map<string, Push>()
+  /** channelId → next probe time (only for live channels) */
+  private probes = new Map<string, number>()
+  private probing = new Set<string>()
+  private health = new Map<string, IngestHealth>()
+  onHealth: HealthListener = () => {}
   private ticking = false
   private timer: Timer | null = null
   private mediamtxDown = false
@@ -67,6 +78,15 @@ export class Supervisor {
       await this.db.update(channels).set({ isLive: true, liveSince: now, updatedAt: now }).where(inArray(channels.id, newlyLive))
       console.log(`[supervisor] live: ${newlyLive.length} channel(s)`)
     }
+    for (const c of liveChannels) if (!this.probes.has(c.id)) this.probes.set(c.id, Date.now() + PROBE_FIRST_MS)
+    for (const id of [...this.probes.keys()]) {
+      if (!liveIds.includes(id)) {
+        this.probes.delete(id)
+        this.health.delete(id)
+        await this.db.update(channels).set({ ingestHealth: null }).where(eq(channels.id, id))
+        this.onHealth(id, false, [])
+      }
+    }
     await this.db
       .update(channels)
       .set({ isLive: false, liveSince: null, updatedAt: now })
@@ -105,6 +125,15 @@ export class Supervisor {
       console.log(`[supervisor] start push → ${d.platform} (${d.name})`)
     }
 
+    // 4b. Measure ingest health (background, one probe per channel at a time).
+    for (const c of liveChannels) {
+      const due = this.probes.get(c.id) ?? 0
+      if (Date.now() < due || this.probing.has(c.id)) continue
+      this.probes.set(c.id, Date.now() + PROBE_EVERY_MS)
+      const platforms = wanted.filter((w) => w.d.channelId === c.id).map((w) => w.d.platform as PlatformId)
+      void this.probe(c.id, c.ingestKey, platforms)
+    }
+
     // 5. Publish status.
     if (stoppedIds.length) await this.writeIdle(stoppedIds)
     for (const p of this.pushes.values()) {
@@ -126,6 +155,29 @@ export class Supervisor {
         sql`${destinationStatus.state} != 'idle'`,
         this.pushes.size ? sql`${destinationStatus.destinationId} NOT IN ${[...this.pushes.keys()]}` : sql`1=1`,
       ))
+  }
+
+  private async probe(channelId: string, ingestKey: string, platforms: PlatformId[]) {
+    this.probing.add(channelId)
+    try {
+      const h = await probeIngest(inputUrl(ingestKey))
+      if (!h || !this.probes.has(channelId)) return
+      this.health.set(channelId, h)
+      await this.db.update(channels).set({ ingestHealth: JSON.stringify(h) }).where(eq(channels.id, channelId))
+      const issues = healthIssues(h, platforms)
+      console.log(`[health] ${channelId.slice(0, 8)}: ${h.video?.width}x${h.video?.height}@${h.video?.fps} key=${h.video?.keyframeInterval}s ${h.totalKbps}kbps · ${issues.length} issue(s)`)
+      this.onHealth(channelId, true, issues)
+    } catch (e) {
+      console.error('[health]', e instanceof Error ? e.message : e)
+    } finally {
+      this.probing.delete(channelId)
+    }
+  }
+
+  /** Last measured issues for a live channel (for new dock connections). */
+  issuesFor(channelId: string, platforms: PlatformId[]) {
+    const h = this.health.get(channelId)
+    return h ? healthIssues(h, platforms) : null
   }
 
   private async writeIdle(ids: string[]) {

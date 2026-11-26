@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const id = () => text('id').primaryKey().$defaultFn(() => crypto.randomUUID())
 const now = (name: string) =>
@@ -24,6 +24,8 @@ export const channels = sqliteTable('channels', {
   twitchLogin: text('twitch_login'),
   kickSlug: text('kick_slug'),
   youtubeHandle: text('youtube_handle'),
+  /** Latest ingest analysis from the relay (JSON, see @sp/shared IngestHealth). */
+  ingestHealth: text('ingest_health'),
   liveSince: integer('live_since', { mode: 'timestamp_ms' }),
   updatedAt: now('updated_at'),
 })
@@ -39,6 +41,8 @@ export const destinations = sqliteTable('destinations', {
   /** Masked key for display, e.g. "live…9f2a" */
   streamKeyHint: text('stream_key_hint').notNull(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  /** Set when the destination was created by "Connect with …" (OAuth). */
+  connectionId: text('connection_id'),
   createdAt: now('created_at'),
   /** Bumped on any change; relay restarts the push when it moves. */
   updatedAt: now('updated_at'),
@@ -52,4 +56,35 @@ export const destinationStatus = sqliteTable('destination_status', {
   bitrateKbps: integer('bitrate_kbps'),
   startedAt: integer('started_at', { mode: 'timestamp_ms' }),
   updatedAt: now('updated_at'),
+})
+
+/** A platform account linked with OAuth ("Connect with YouTube/Twitch/Kick"). */
+export const connections = sqliteTable('connections', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  /** Platform's account/channel ID */
+  accountId: text('account_id').notNull(),
+  /** Display name, e.g. "@cybnischal" or "shroud" */
+  username: text('username').notNull(),
+  /** Encrypted with ENCRYPTION_KEY */
+  accessTokenEnc: text('access_token_enc').notNull(),
+  refreshTokenEnc: text('refresh_token_enc'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+  scopes: text('scopes'),
+  createdAt: now('created_at'),
+  updatedAt: now('updated_at'),
+}, (t) => [uniqueIndex('connections_user_platform_idx').on(t.userId, t.platform)])
+
+/** OBS plugin sign-in (OAuth device flow style). */
+export const deviceCodes = sqliteTable('device_codes', {
+  /** SHA-256 of the secret device code the plugin polls with */
+  deviceCodeHash: text('device_code_hash').primaryKey(),
+  /** Short code the user types/approves, e.g. "WDJB-MJHT" */
+  userCode: text('user_code').notNull().unique(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['pending', 'approved', 'consumed', 'denied'] }).notNull().default('pending'),
+  clientName: text('client_name'),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: now('created_at'),
 })

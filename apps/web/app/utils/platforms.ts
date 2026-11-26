@@ -34,21 +34,19 @@ export function formatKbps(kbps: number | null | undefined): string {
   return kbps >= 1000 ? `${(kbps / 1000).toFixed(1)} Mbps` : `${kbps} kbps`
 }
 
-/** Destination state → label + dot color, shared by every list. */
-export function destinationState(enabled: boolean, state: string, channelLive: boolean) {
-  if (!enabled) return { label: 'Off', dot: 'bg-(--ui-text-dimmed)', text: 'text-dimmed' }
+/** Destination state → status tone + label, shared by every list. */
+export function destinationStatus(enabled: boolean, state: string, channelLive: boolean): { tone: 'live' | 'info' | 'warning' | 'error' | 'idle' | 'off', label: string } {
+  if (!enabled) return { tone: 'off', label: 'Off' }
   switch (state) {
-    case 'live': return { label: 'Live', dot: 'bg-success', text: 'text-success', pulse: true }
-    case 'connecting': return { label: 'Connecting', dot: 'bg-info', text: 'text-info', pulse: true }
-    case 'retrying': return { label: 'Reconnecting', dot: 'bg-warning', text: 'text-warning', pulse: true }
-    case 'error': return { label: 'Error', dot: 'bg-error', text: 'text-error' }
-    default: return channelLive
-      ? { label: 'Starting', dot: 'bg-info', text: 'text-info', pulse: true }
-      : { label: 'Ready', dot: 'bg-(--ui-text-muted)', text: 'text-muted' }
+    case 'live': return { tone: 'live', label: 'Live' }
+    case 'connecting': return { tone: 'info', label: 'Connecting' }
+    case 'retrying': return { tone: 'warning', label: 'Reconnecting' }
+    case 'error': return { tone: 'error', label: 'Error' }
+    default: return channelLive ? { tone: 'info', label: 'Starting' } : { tone: 'idle', label: 'Ready' }
   }
 }
 
-export const PLUGIN_VERSION = '0.1.0'
+export const PLUGIN_VERSION = '0.2.0'
 const REL = `https://github.com/panelab/liveloom/releases/download/obs-multichat-v${PLUGIN_VERSION}`
 export const pluginDownloads = [
   { os: 'Windows', icon: 'i-simple-icons-windows', file: `obs-multichat-${PLUGIN_VERSION}-windows-x64.zip`, hint: 'Extract into C:\\ProgramData\\obs-studio\\plugins' },

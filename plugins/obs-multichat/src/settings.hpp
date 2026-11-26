@@ -10,6 +10,7 @@ constexpr const char *DEFAULT_SERVER = "https://stream.discerns.app";
 struct Settings {
 	std::string server = DEFAULT_SERVER;
 	std::string token;
+	std::string account; // email shown in the dock after sign-in
 	bool dockShown = false; // show the dock once on first install
 };
 

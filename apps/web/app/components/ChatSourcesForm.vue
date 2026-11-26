@@ -29,12 +29,12 @@ const fields = [
   { key: 'youtube', label: 'YouTube', placeholder: '@handle or video link', icon: 'i-simple-icons-youtube', color: '#ff0033' },
 ] as const
 
-const stateText: Record<string, { label: string, dot: string }> = {
-  connected: { label: 'Connected', dot: 'bg-success' },
-  connecting: { label: 'Connecting', dot: 'bg-info' },
-  offline: { label: 'Not live', dot: 'bg-(--ui-text-dimmed)' },
-  error: { label: 'Error', dot: 'bg-error' },
-  off: { label: 'Off', dot: 'bg-(--ui-text-dimmed)' },
+const stateTone: Record<string, { label: string, tone: 'live' | 'info' | 'off' | 'error' }> = {
+  connected: { label: 'Connected', tone: 'live' },
+  connecting: { label: 'Connecting', tone: 'info' },
+  offline: { label: 'Not live', tone: 'off' },
+  error: { label: 'Error', tone: 'error' },
+  off: { label: 'Off', tone: 'off' },
 }
 const statusOf = (p: string) => props.sources.find((s) => s.platform === p)
 </script>
@@ -43,21 +43,18 @@ const statusOf = (p: string) => props.sources.find((s) => s.platform === p)
   <form class="space-y-4" @submit.prevent="save">
     <div v-for="f in fields" :key="f.key" class="space-y-1.5">
       <div class="flex items-center justify-between">
-        <label :for="`chat-${f.key}`" class="flex items-center gap-1.5 text-xs font-medium text-muted">
-          <UIcon :name="f.icon" class="size-3.5" :style="{ color: f.color }" />{{ f.label }}
+        <label :for="`chat-${f.key}`" class="flex items-center gap-1.5 text-sm font-medium text-toned">
+          <UiPlatformIcon :platform="f.key" size="sm" />{{ f.label }}
         </label>
         <UTooltip v-if="statusOf(f.key)?.target" :text="statusOf(f.key)?.message || statusOf(f.key)?.target || ''">
-          <span class="flex items-center gap-1.5 text-[11px] text-dimmed">
-            <StatusDot :color="stateText[statusOf(f.key)!.state]?.dot ?? 'bg-muted'" :pulse="statusOf(f.key)!.state === 'connecting'" />
-            {{ stateText[statusOf(f.key)!.state]?.label }}
-          </span>
+          <UiStatus :tone="stateTone[statusOf(f.key)!.state]?.tone ?? 'off'" :label="stateTone[statusOf(f.key)!.state]?.label" :pulse="statusOf(f.key)!.state === 'connecting'" />
         </UTooltip>
       </div>
       <UInput :id="`chat-${f.key}`" v-model="form[f.key]" :placeholder="f.placeholder" class="w-full" />
     </div>
     <UButton type="submit" label="Save" block :loading="saving" :disabled="!dirty" />
     <p class="text-xs text-dimmed">
-      Reading chat needs no login. YouTube only shows chat while you're live.
+      Reading chat needs no login. Connected accounts fill these in for you. YouTube chat appears only while you're live.
     </p>
   </form>
 </template>

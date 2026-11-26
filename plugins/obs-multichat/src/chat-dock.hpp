@@ -4,7 +4,9 @@
 #include <QTimer>
 #include <QWidget>
 
+class QFrame;
 class QLabel;
+class QPushButton;
 class QToolButton;
 
 namespace multichat {
@@ -19,22 +21,31 @@ protected:
 	QVariant loadResource(int type, const QUrl &name) override;
 };
 
-/** "Multichat" dock: merged chat for the streamer, inside OBS. */
+/** "Multichat" dock: merged chat and stream health for the streamer, inside OBS. */
 class ChatDock : public QWidget {
 	Q_OBJECT
 public:
 	explicit ChatDock(QWidget *parent = nullptr);
 
+	/** Opens the browser sign-in flow (also used from the settings dialog). */
+	void signIn(const std::string &server);
+
 private:
 	void poll();
 	void rebuild();
 	void updateHeader();
+	void updateHealth();
 	void openSettings();
 
 	QLabel *dot_;
 	QLabel *status_;
 	QLabel *platforms_[3];
 	QToolButton *settings_;
+	QFrame *signInBox_;
+	QPushButton *signInButton_;
+	QFrame *healthBox_;
+	QLabel *healthIcon_;
+	QLabel *healthText_;
 	ChatBrowser *view_;
 	QTimer timer_;
 	uint64_t lastRev_ = ~0ull;

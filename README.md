@@ -14,6 +14,13 @@ Dashboard (Nuxt) ──► Turso/libSQL ◄── relay reads destinations, writ
 
 The relay copies the stream without re-encoding, so CPU use stays close to zero. Your upload bandwidth is only spent once.
 
+**Highlights**
+- **Connect with YouTube, Twitch and Kick:** sign in once and LiveLoom fetches your stream keys, server URLs and chat channels. See [docs/connect-apps.md](docs/connect-apps.md).
+- **One-click OBS setup:** the Multichat plugin signs in with a short code and fills in OBS's stream server, key, keyframe interval and bitrate.
+- **Stream health checks:** a few seconds after you go live, LiveLoom measures what OBS sends (resolution, frame rate, keyframes, bitrate, codecs) and tells you the exact OBS setting to change for each platform you're streaming to, both in the dashboard and in the OBS dock.
+- **Merged chat** from Twitch, Kick and YouTube in the dashboard and in OBS.
+- Open source and self-hosted: no watermark, no destination limit, and your keys stay on your server.
+
 ## Multichat for OBS
 
 A native OBS plugin that merges **Twitch, Kick and YouTube chat** into one feed, with each message tagged by its platform's icon.
@@ -25,6 +32,7 @@ A native OBS plugin that merges **Twitch, Kick and YouTube chat** into one feed,
 - **Multichat dock**: read chat from every platform on your monitor, inside OBS.
 - **Multichat source**: show chat on stream. Font, colors, background, platform icons, platform filters and fade-out are all configurable.
 - Usernames keep their platform colors, and emotes appear as images.
+- **Stream health** warnings in the dock while you're live, each with the exact fix.
 - Needs no platform logins or API keys: LiveLoom reads chat on the server and streams it to the plugin.
 
 ### Install
@@ -39,10 +47,12 @@ Download the file for your OS from the [latest release](https://github.com/panel
 
 Requires OBS 30 or newer. Then:
 
-1. In the LiveLoom dashboard, open **Chat** and enter your Twitch username, Kick username and YouTube @handle.
-2. Open **Setup** and copy the **Plugin token**.
-3. Restart OBS, click **⚙** in the Multichat dock, and paste the token.
+1. Restart OBS. The **Multichat** dock opens.
+2. Click **Sign in to LiveLoom**. Your browser opens with a code. Check that it matches the one in OBS, then click **Approve**.
+3. OBS's stream settings are filled in for you: LiveLoom server and key, 2 s keyframes, and bitrate capped at 6000 Kbps.
 4. To show chat on stream, add **Sources → + → Multichat** to a scene.
+
+Chat sources come from your connected accounts, or you can enter them on the dashboard's **Chat** page. The dock also shows stream health warnings while you're live.
 
 Source code and build instructions: [`plugins/obs-multichat`](plugins/obs-multichat).
 

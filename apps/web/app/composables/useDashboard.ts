@@ -1,4 +1,4 @@
-import type { PlatformId } from '@sp/shared'
+import type { HealthIssue, IngestHealth, PlatformId } from '@sp/shared'
 
 export interface DestinationView {
   id: string
@@ -7,6 +7,7 @@ export interface DestinationView {
   serverUrl: string
   streamKeyHint: string
   enabled: boolean
+  connected: boolean
   status: { state: string, message: string | null, bitrateKbps: number | null, startedAt: number | null }
 }
 
@@ -15,7 +16,7 @@ export interface DestinationView {
  * the tab is visible (the relay writes status to the DB at that rate).
  */
 export function useDashboard() {
-  const data = useState<{ isLive: boolean, liveSince: number | null, destinations: DestinationView[] } | null>('dash', () => null)
+  const data = useState<{ isLive: boolean, liveSince: number | null, destinations: DestinationView[], health: IngestHealth | null, issues: HealthIssue[] } | null>('dash', () => null)
   const now = useState('dash-now', () => Date.now())
   const pending = useState('dash-pending', () => true)
 
@@ -35,7 +36,10 @@ export function useDashboard() {
   const totalKbps = computed(() => streaming.value.reduce((n, d) => n + (d.status.bitrateKbps ?? 0), 0))
   const uptime = computed(() => (liveSince.value ? formatDuration(now.value - liveSince.value) : null))
 
-  return { data, now, pending, refresh, destinations, isLive, liveSince, enabled, streaming, totalKbps, uptime }
+  const health = computed(() => data.value?.health ?? null)
+  const issues = computed(() => data.value?.issues ?? [])
+
+  return { data, now, pending, refresh, destinations, isLive, liveSince, enabled, streaming, totalKbps, uptime, health, issues }
 }
 
 /** Call once (in the layout) to start polling. */
@@ -55,6 +59,17 @@ export function useDashboardPolling() {
 
 export function useChannel() {
   return useFetch('/api/channel', { key: 'channel' })
+}
+
+export function useConnections() {
+  return useFetch('/api/connect', { key: 'connections', default: () => [] })
+}
+
+/** The dashboard's public origin (same on server and client, so no hydration mismatch). */
+export function useSiteOrigin() {
+  const config = useRuntimeConfig()
+  const req = useRequestURL()
+  return computed(() => (config.public.siteUrl as string) || req.origin)
 }
 
 export function useChatConfig() {

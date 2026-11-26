@@ -21,6 +21,7 @@ const factories: Record<ChatPlatform, new (target: string, ev: ConstructorParame
 /** Merged chat for one channel: its platform connections, history and listeners. */
 class ChannelChat {
   readonly subscribers = new Set<Send>()
+  health: ChatEvent | null = null
   private sources = new Map<ChatPlatform, ChatSource>()
   private status = new Map<ChatPlatform, ChatSourceStatus>()
   private history: ChatMessage[] = []
@@ -53,6 +54,11 @@ class ChannelChat {
     this.sources.clear()
   }
 
+  setHealth(ev: ChatEvent) {
+    this.health = ev
+    this.broadcast(ev)
+  }
+
   hello(): ChatEvent {
     return { type: 'hello', history: this.history, sources: [...this.status.values()] }
   }
@@ -70,7 +76,7 @@ class ChannelChat {
     this.broadcast({ type: 'status', sources: [...this.status.values()] })
   }
 
-  private broadcast(ev: ChatEvent) {
+  broadcast(ev: ChatEvent) {
     for (const send of this.subscribers) send(ev)
   }
 }
@@ -81,6 +87,15 @@ class ChannelChat {
  */
 export class ChatHub {
   private chats = new Map<string, ChannelChat>()
+  /** Latest health event per channel, kept even with no listeners. */
+  private lastHealth = new Map<string, ChatEvent>()
+
+  publishHealth(channelId: string, live: boolean, issues: { level: string, title: string, fix: string }[]) {
+    const ev: ChatEvent = { type: 'health', live, issues: issues.map(({ level, title, fix }) => ({ level, title, fix })) }
+    if (live) this.lastHealth.set(channelId, ev)
+    else this.lastHealth.delete(channelId)
+    this.chats.get(channelId)?.setHealth(ev)
+  }
   private timer: Timer | null = null
 
   constructor(private db: Db) {}
@@ -113,6 +128,8 @@ export class ChatHub {
     chat.idleTimer = null
     chat.subscribers.add(send)
     send(chat.hello())
+    const health = this.lastHealth.get(channel.id)
+    if (health) send(health)
 
     return () => {
       chat.subscribers.delete(send)

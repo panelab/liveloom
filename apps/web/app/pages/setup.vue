@@ -1,14 +1,12 @@
 <script setup lang="ts">
 const toast = useToast()
 const dash = useDashboard()
-const config = useRuntimeConfig()
+const origin = useSiteOrigin()
 const { data: channel, refresh: refreshChannel } = await useChannel()
 const { data: chat, refresh: refreshChat } = await useChatConfig()
 
-const chatServer = computed(() => config.public.chatServerUrl || (import.meta.client ? location.origin : ''))
-
 async function rotateIngest() {
-  if (!confirm('Reset your stream key? You will need to paste the new one into OBS.')) return
+  if (!confirm('Reset your stream key? OBS will need the new one (sign in from the plugin again, or paste it).')) return
   try {
     await $fetch('/api/channel/rotate', { method: 'POST' })
     await refreshChannel()
@@ -19,92 +17,109 @@ async function rotateIngest() {
 }
 
 async function rotateToken() {
-  if (!confirm('Reset the plugin token? OBS will need the new one.')) return
+  if (!confirm('Reset the plugin token? Signed-in OBS plugins will need to sign in again.')) return
   await $fetch('/api/chat/rotate', { method: 'POST' })
   await refreshChat()
   toast.add({ title: 'Plugin token reset', icon: 'i-lucide-check', color: 'success' })
 }
 
 const obsSettings = [
-  { k: 'Service', v: 'Custom…' },
   { k: 'Keyframe interval', v: '2 s' },
   { k: 'Video bitrate', v: '6000 Kbps' },
   { k: 'Rate control', v: 'CBR' },
   { k: 'Audio', v: 'AAC · 160 Kbps' },
+  { k: 'Resolution', v: '1920×1080' },
 ]
+const manualOpen = ref(false)
 </script>
 
 <template>
   <UDashboardPanel id="setup">
     <template #header>
-      <UDashboardNavbar title="Setup" :ui="{ root: 'h-12' }" />
+      <UDashboardNavbar title="Setup" :ui="{ root: 'h-14' }" />
     </template>
 
     <template #body>
       <div class="mx-auto w-full max-w-3xl space-y-6">
-        <Section title="Stream from OBS" description="OBS → Settings → Stream. Choose “Custom…” and paste these.">
-          <div class="space-y-4">
-            <CopyField label="Server" :value="channel?.ingestUrl ?? ''" />
-            <CopyField label="Stream key" :value="channel?.ingestKey ?? ''" secret hint="Keep this private">
-              <template #actions>
-                <UTooltip :text="dash.isLive.value ? 'Stop streaming first' : 'Reset key'">
-                  <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset stream key" :disabled="dash.isLive.value" @click="rotateIngest" />
-                </UTooltip>
-              </template>
-            </CopyField>
+        <UiPageIntro title="Set up OBS" description="The Multichat plugin signs OBS in to LiveLoom and fills in your stream settings, so there’s nothing to copy." />
 
-            <div>
-              <p class="section-label mb-2">Recommended OBS output settings</p>
-              <dl class="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-md border border-default divide-x divide-default">
-                <div v-for="s in obsSettings" :key="s.k" class="px-3 py-2">
-                  <dt class="text-[11px] text-dimmed">{{ s.k }}</dt>
-                  <dd class="font-mono text-xs text-highlighted">{{ s.v }}</dd>
-                </div>
-              </dl>
-              <p class="mt-2 text-xs text-dimmed">
-                LiveLoom forwards your stream without re-encoding, so these are what every platform receives. 6000 Kbps works on all of them.
-              </p>
-            </div>
+        <HealthPanel v-if="dash.isLive.value" />
+
+        <UiPanel title="1. Install the Multichat plugin" :description="`Version ${PLUGIN_VERSION} · OBS 30 or newer`">
+          <div class="grid gap-2 sm:grid-cols-3">
+            <a
+              v-for="d in pluginDownloads"
+              :key="d.os"
+              :href="d.url"
+              class="group rounded-md border border-default bg-muted px-3 py-2.5 transition-colors hover:border-accented hover:bg-elevated"
+            >
+              <div class="flex items-center gap-2">
+                <UIcon :name="d.icon" class="size-4 text-highlighted" />
+                <span class="text-sm font-medium text-highlighted">{{ d.os }}</span>
+                <UIcon name="i-lucide-download" class="ml-auto size-3.5 text-dimmed group-hover:text-highlighted" />
+              </div>
+              <p class="mt-1 text-xs text-dimmed">{{ d.hint }}</p>
+            </a>
           </div>
-        </Section>
+        </UiPanel>
 
-        <Section title="Multichat OBS plugin" description="Merged Twitch, Kick and YouTube chat as an OBS dock and an on-stream source.">
+        <UiPanel title="2. Sign in from OBS">
           <template #actions>
-            <UBadge :label="`v${PLUGIN_VERSION}`" variant="subtle" color="neutral" class="font-mono" />
+            <UBadge v-if="chat?.pluginSeen" label="Signed in" icon="i-lucide-check" color="success" variant="subtle" />
           </template>
-          <div class="space-y-5">
-            <div class="grid gap-2 sm:grid-cols-3">
-              <a
-                v-for="d in pluginDownloads"
-                :key="d.os"
-                :href="d.url"
-                class="group rounded-md border border-default bg-muted px-3 py-2.5 transition-colors hover:border-accented hover:bg-elevated"
-              >
-                <div class="flex items-center gap-2">
-                  <UIcon :name="d.icon" class="size-4 text-highlighted" />
-                  <span class="text-sm font-medium text-highlighted">{{ d.os }}</span>
-                  <UIcon name="i-lucide-download" class="ml-auto size-3.5 text-dimmed group-hover:text-highlighted" />
-                </div>
-                <p class="mt-1 text-[11px] leading-snug text-dimmed">{{ d.hint }}</p>
-              </a>
+          <ol class="space-y-2 text-sm text-muted">
+            <li class="flex gap-2"><span class="font-mono text-dimmed">1</span><span>Restart OBS. The <span class="text-highlighted">Multichat</span> dock opens.</span></li>
+            <li class="flex gap-2"><span class="font-mono text-dimmed">2</span><span>Click <span class="text-highlighted">Sign in to LiveLoom</span> in the dock. Your browser opens with a code.</span></li>
+            <li class="flex gap-2"><span class="font-mono text-dimmed">3</span><span>Check the code matches OBS and click <span class="text-highlighted">Approve</span>. OBS’s stream settings are filled in.</span></li>
+          </ol>
+          <p class="mt-3 text-sm text-muted">
+            Browser didn’t open? Go to <ULink to="/device" class="font-mono text-highlighted underline">{{ origin.replace(/^https?:\/\//, '') }}/device</ULink> and enter the code.
+          </p>
+        </UiPanel>
+
+        <UiPanel title="3. Recommended OBS settings" description="LiveLoom forwards your stream as-is, so every platform receives exactly these.">
+          <dl class="grid grid-cols-2 overflow-hidden rounded-md border border-default divide-default sm:grid-cols-5 sm:divide-x">
+            <div v-for="s in obsSettings" :key="s.k" class="px-3 py-2">
+              <dt class="text-2xs text-dimmed">{{ s.k }}</dt>
+              <dd class="font-mono text-xs text-highlighted">{{ s.v }}</dd>
             </div>
+          </dl>
+          <p class="mt-2 text-xs text-dimmed">OBS → Settings → Output (Output Mode: Advanced) → Streaming. 6000 Kbps works on every platform.</p>
+        </UiPanel>
 
-            <ol class="space-y-1.5 text-xs text-muted list-decimal pl-4">
-              <li>Install the plugin and restart OBS. The <span class="text-highlighted">Multichat</span> dock opens.</li>
-              <li>Click ⚙ in the dock and paste the server and token below.</li>
-              <li>Add chat to a scene with <span class="text-highlighted">Sources → + → Multichat</span>.</li>
-            </ol>
-
-            <CopyField label="Plugin server" :value="chatServer" />
-            <CopyField label="Plugin token" :value="chat?.token ?? ''" secret>
-              <template #actions>
-                <UTooltip text="Reset token">
-                  <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset plugin token" @click="rotateToken" />
-                </UTooltip>
-              </template>
-            </CopyField>
-          </div>
-        </Section>
+        <UCollapsible v-model:open="manualOpen">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            :trailing-icon="manualOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            label="Set up manually instead"
+            class="-ml-2.5"
+          />
+          <template #content>
+            <UiPanel class="mt-2" title="Manual setup" description="For OBS without the plugin, or other streaming software. OBS → Settings → Stream → Service: Custom…">
+              <div class="space-y-4">
+                <UiCopyField label="Server" :value="channel?.ingestUrl ?? ''" />
+                <UiCopyField label="Stream key" :value="channel?.ingestKey ?? ''" secret hint="Keep this private">
+                  <template #actions>
+                    <UTooltip :text="dash.isLive.value ? 'Stop streaming first' : 'Reset key'">
+                      <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset stream key" :disabled="dash.isLive.value" @click="rotateIngest" />
+                    </UTooltip>
+                  </template>
+                </UiCopyField>
+                <USeparator />
+                <p class="text-sm text-muted">Plugin without sign-in: click ⚙ in the Multichat dock and paste these.</p>
+                <UiCopyField label="Plugin server" :value="origin" />
+                <UiCopyField label="Plugin token" :value="chat?.token ?? ''" secret>
+                  <template #actions>
+                    <UTooltip text="Reset token">
+                      <UButton icon="i-lucide-rotate-ccw" size="xs" variant="ghost" color="neutral" aria-label="Reset plugin token" @click="rotateToken" />
+                    </UTooltip>
+                  </template>
+                </UiCopyField>
+              </div>
+            </UiPanel>
+          </template>
+        </UCollapsible>
       </div>
     </template>
   </UDashboardPanel>

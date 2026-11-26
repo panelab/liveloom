@@ -51,6 +51,8 @@ target_sources(
     src/chat-render.cpp
     src/chat-dock.cpp
     src/chat-source.cpp
+    src/http.cpp
+    src/sign-in.cpp
     src/resources.qrc
 )
 

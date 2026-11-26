@@ -11,10 +11,15 @@ const nav = computed<NavigationMenuItem[]>(() => [
     label: 'Destinations',
     icon: 'i-lucide-radio-tower',
     to: '/destinations',
-    badge: dash.destinations.value.length ? String(dash.destinations.value.length) : undefined,
+    badge: dash.destinations.value.length ? { label: String(dash.destinations.value.length), variant: 'subtle', color: 'neutral' } : undefined,
   },
   { label: 'Chat', icon: 'i-lucide-messages-square', to: '/chat' },
-  { label: 'Setup', icon: 'i-lucide-settings-2', to: '/setup' },
+  {
+    label: 'Setup',
+    icon: 'i-lucide-settings-2',
+    to: '/setup',
+    badge: dash.issues.value.length ? { label: String(dash.issues.value.length), color: 'warning', variant: 'subtle' } : undefined,
+  },
 ])
 
 const links: NavigationMenuItem[] = [
@@ -30,12 +35,19 @@ async function logout() {
 
 const userMenu = computed(() => [
   [{ label: user.value?.email ?? '', type: 'label' as const }],
-  [{
-    label: colorMode.value === 'dark' ? 'Light theme' : 'Dark theme',
-    icon: colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon',
-    onSelect: () => { colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark' },
-  }],
-  [{ label: 'Sign out', icon: 'i-lucide-log-out', color: 'error' as const, onSelect: logout }],
+  [
+    {
+      label: 'Theme',
+      icon: colorMode.value === 'dark' ? 'i-lucide-moon' : 'i-lucide-sun',
+      children: [
+        { label: 'Dark', icon: 'i-lucide-moon', type: 'checkbox' as const, checked: colorMode.preference === 'dark', onSelect: () => (colorMode.preference = 'dark') },
+        { label: 'Light', icon: 'i-lucide-sun', type: 'checkbox' as const, checked: colorMode.preference === 'light', onSelect: () => (colorMode.preference = 'light') },
+        { label: 'System', icon: 'i-lucide-monitor', type: 'checkbox' as const, checked: colorMode.preference === 'system', onSelect: () => (colorMode.preference = 'system') },
+      ],
+    },
+    { label: 'Design system', icon: 'i-lucide-swatch-book', to: '/design' },
+  ],
+  [{ label: 'Sign out', icon: 'i-lucide-log-out', onSelect: logout }],
 ])
 </script>
 
@@ -47,51 +59,39 @@ const userMenu = computed(() => [
       :default-size="15"
       :min-size="13"
       :max-size="20"
-      class="bg-muted/60"
-      :ui="{ footer: 'border-t border-default', header: 'h-12' }"
+      class="bg-muted"
+      :ui="{ header: 'h-14', footer: 'border-t border-default' }"
     >
       <template #header="{ collapsed }">
-        <NuxtLink to="/" class="flex items-center gap-2 min-w-0">
-          <img src="/icon.svg" alt="" class="size-5 shrink-0 rounded">
-          <span v-if="!collapsed" class="font-semibold tracking-tight text-highlighted truncate">LiveLoom</span>
+        <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5">
+          <AppLogo :size="22" />
+          <span v-if="!collapsed" class="truncate text-base font-semibold tracking-tight text-highlighted">LiveLoom</span>
         </NuxtLink>
       </template>
 
       <template #default="{ collapsed }">
-        <!-- live pill -->
         <NuxtLink
           to="/"
-          class="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors"
-          :class="dash.isLive.value ? 'border-success/30 bg-success/10 text-success' : 'border-default text-muted hover:bg-elevated'"
+          class="flex h-8 items-center gap-2 rounded-md border px-2.5 transition-colors"
+          :class="dash.isLive.value ? 'border-success/30 bg-success/10' : 'border-default hover:bg-elevated'"
         >
-          <StatusDot :color="dash.isLive.value ? 'bg-success' : 'bg-(--ui-text-dimmed)'" :pulse="dash.isLive.value" />
-          <template v-if="!collapsed">
-            <span class="font-medium">{{ dash.isLive.value ? 'Live' : 'Offline' }}</span>
-            <span v-if="dash.isLive.value" class="ml-auto font-mono tabular-nums">{{ dash.uptime.value }}</span>
-          </template>
+          <UiStatus :tone="dash.isLive.value ? 'live' : 'off'" :label="collapsed ? undefined : (dash.isLive.value ? 'Live' : 'Offline')" />
+          <span v-if="!collapsed && dash.isLive.value" class="ml-auto font-mono text-xs tabular-nums text-success">{{ dash.uptime.value }}</span>
         </NuxtLink>
 
-        <UNavigationMenu :items="nav" orientation="vertical" :collapsed="collapsed" highlight class="mt-2" />
+        <UNavigationMenu :items="nav" orientation="vertical" :collapsed="collapsed" class="mt-3" />
 
         <div class="mt-auto">
-          <p v-if="!collapsed" class="section-label px-2.5 pb-1">Resources</p>
+          <p v-if="!collapsed" class="label-caps px-2.5 pb-1.5">Resources</p>
           <UNavigationMenu :items="links" orientation="vertical" :collapsed="collapsed" />
         </div>
       </template>
 
       <template #footer="{ collapsed }">
-        <UDropdownMenu :items="userMenu" :content="{ side: 'top', align: 'start' }" class="w-full">
-          <UButton
-            color="neutral"
-            variant="ghost"
-            block
-            :square="collapsed"
-            class="justify-start data-[state=open]:bg-elevated"
-          >
-            <span class="grid size-5 shrink-0 place-items-center rounded bg-accented text-[10px] font-semibold uppercase text-highlighted">
-              {{ user?.email?.[0] ?? '?' }}
-            </span>
-            <span v-if="!collapsed" class="truncate text-xs text-muted">{{ user?.email }}</span>
+        <UDropdownMenu :items="userMenu" :content="{ side: 'top', align: 'start' }" :ui="{ content: 'w-56' }" class="w-full">
+          <UButton color="neutral" variant="ghost" block :square="collapsed" class="justify-start data-[state=open]:bg-elevated">
+            <UAvatar :alt="user?.email ?? '?'" size="2xs" />
+            <span v-if="!collapsed" class="truncate text-sm text-toned">{{ user?.email }}</span>
             <UIcon v-if="!collapsed" name="i-lucide-chevrons-up-down" class="ml-auto size-3.5 text-dimmed" />
           </UButton>
         </UDropdownMenu>

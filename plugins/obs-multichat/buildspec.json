@@ -38,7 +38,7 @@
     },
     "name": "obs-multichat",
     "displayName": "Multichat for OBS",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "author": "LiveLoom",
     "website": "https://stream.discerns.app",
     "email": "noreply@stream.discerns.app"

@@ -32,6 +32,8 @@ Settings loadSettings()
 	if (token)
 		s.token = token;
 	s.dockShown = obs_data_get_bool(data, "dock_shown");
+	if (const char *acct = obs_data_get_string(data, "account"))
+		s.account = acct;
 	obs_data_release(data);
 	return s;
 }
@@ -45,6 +47,7 @@ void saveSettings(const Settings &s)
 	obs_data_set_string(data, "server", s.server.c_str());
 	obs_data_set_string(data, "token", s.token.c_str());
 	obs_data_set_bool(data, "dock_shown", s.dockShown);
+	obs_data_set_string(data, "account", s.account.c_str());
 	obs_data_save_json_safe(data, path.c_str(), "tmp", "bak");
 	obs_data_release(data);
 }

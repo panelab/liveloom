@@ -1,4 +1,5 @@
 import { asc, destinations, destinationStatus, eq } from '@sp/db'
+import { healthIssues, type IngestHealth, type PlatformId } from '@sp/shared'
 
 export default defineEventHandler(async (event) => {
   const { channel, db } = await requireChannel(event)
@@ -9,8 +10,16 @@ export default defineEventHandler(async (event) => {
     .where(eq(destinations.channelId, channel.id))
     .orderBy(asc(destinations.createdAt))
 
+  let health: IngestHealth | null = null
+  try {
+    health = channel.isLive && channel.ingestHealth ? JSON.parse(channel.ingestHealth) : null
+  } catch {}
+  const live = rows.filter(({ d }) => d.enabled).map(({ d }) => d.platform as PlatformId)
+
   return {
     isLive: channel.isLive,
+    health,
+    issues: healthIssues(health, live),
     liveSince: channel.liveSince?.getTime() ?? null,
     destinations: rows.map(({ d, s }) => ({
       id: d.id,
@@ -19,6 +28,7 @@ export default defineEventHandler(async (event) => {
       serverUrl: d.serverUrl,
       streamKeyHint: d.streamKeyHint,
       enabled: d.enabled,
+      connected: !!d.connectionId,
       status: {
         state: s?.state ?? 'idle',
         message: s?.message ?? null,

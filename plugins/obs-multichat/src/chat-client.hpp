@@ -26,6 +26,8 @@ public:
 
 	std::vector<Message> messages() const;
 	std::vector<SourceStatus> sources() const;
+	std::vector<HealthIssue> healthIssues() const;
+	bool streamLive() const;
 	ConnState state() const;
 	std::string stateMessage() const;
 	/** Changes whenever anything above changes. */
@@ -58,6 +60,8 @@ private:
 	std::string server_, token_;
 	std::deque<Message> messages_;
 	std::vector<SourceStatus> sources_;
+	std::vector<HealthIssue> health_;
+	bool live_ = false;
 	ConnState state_ = ConnState::NotConfigured;
 	std::string stateMsg_;
 

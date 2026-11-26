@@ -17,7 +17,15 @@ export default defineNuxtConfig({
     databaseUrl: '',
     databaseAuthToken: '',
     encryptionKey: '',
+    // "Connect with …" app credentials: NUXT_CONNECT_TWITCH_CLIENT_ID, NUXT_CONNECT_TWITCH_CLIENT_SECRET, etc.
+    connect: {
+      youtube: { clientId: '', clientSecret: '' },
+      twitch: { clientId: '', clientSecret: '' },
+      kick: { clientId: '', clientSecret: '' },
+    },
     public: {
+      // Public URL of this dashboard, used for OAuth callbacks and the plugin sign-in page
+      siteUrl: '', // NUXT_PUBLIC_SITE_URL
       ingestUrl: 'rtmp://localhost:1935/live', // NUXT_PUBLIC_INGEST_URL
       // Where /chat/events is served (the relay). Empty = same origin (Caddy routes /chat/* to the relay).
       chatServerUrl: '', // NUXT_PUBLIC_CHAT_SERVER_URL

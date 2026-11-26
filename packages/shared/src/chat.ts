@@ -40,6 +40,8 @@ export type ChatEvent =
   | { type: 'hello', history: ChatMessage[], sources: ChatSourceStatus[] }
   | { type: 'message', message: ChatMessage }
   | { type: 'status', sources: ChatSourceStatus[] }
+  /** Stream health for the OBS dock: empty `issues` = all good. Sent when it changes. */
+  | { type: 'health', live: boolean, issues: { level: string, title: string, fix: string }[] }
 
 export function partsToText(parts: ChatPart[]): string {
   return parts.map((p) => (p.t === 'text' ? p.v : p.name)).join('')

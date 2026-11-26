@@ -36,6 +36,13 @@ struct SourceStatus {
 	std::string message;
 };
 
+/** A stream health warning from the server, with the exact fix. */
+struct HealthIssue {
+	std::string level; // "error" | "warning" | "info"
+	std::string title;
+	std::string fix;
+};
+
 enum class ConnState { NotConfigured, Connecting, Connected, BadToken, Error };
 
 int64_t nowMs();

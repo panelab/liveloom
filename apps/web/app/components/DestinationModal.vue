@@ -61,11 +61,11 @@ async function save() {
             v-for="p in platformOrder"
             :key="p"
             type="button"
-            class="flex flex-col items-center gap-1 rounded-md border px-1 py-2 text-[11px] transition-colors"
+            class="flex flex-col items-center gap-1 rounded-md border px-1 py-2 text-2xs transition-colors"
             :class="form.platform === p ? 'border-(--ui-border-inverted) bg-elevated text-highlighted' : 'border-default text-muted hover:bg-elevated/60'"
             @click="pick(p)"
           >
-            <UIcon :name="platformIcon[p]" class="size-4" :style="{ color: platformColor[p] }" />
+            <UiPlatformIcon :platform="p" />
             <span class="truncate w-full text-center">{{ PLATFORMS[p].name.replace(' RTMP', '') }}</span>
           </button>
         </div>
@@ -74,10 +74,10 @@ async function save() {
           <UInput v-model="form.name" required maxlength="60" class="w-full" />
         </UFormField>
         <UFormField label="Server URL" :hint="preset.serverUrl ? 'Prefilled' : 'From the platform\'s live settings'">
-          <UInput v-model="form.serverUrl" required placeholder="rtmp://…" class="w-full" :ui="{ base: 'font-mono text-[13px]' }" />
+          <UInput v-model="form.serverUrl" required placeholder="rtmp://…" class="w-full" :ui="{ base: 'font-mono' }" />
         </UFormField>
         <UFormField label="Stream key" :hint="editing ? `Current: ${editing.streamKeyHint}` : undefined" :description="editing ? 'Leave empty to keep the current key.' : undefined">
-          <UInput v-model="form.streamKey" type="password" :required="!editing" autocomplete="off" class="w-full" :ui="{ base: 'font-mono text-[13px]' }" />
+          <UInput v-model="form.streamKey" type="password" :required="!editing" autocomplete="off" class="w-full" :ui="{ base: 'font-mono' }" />
           <template v-if="preset.keyHelpUrl" #help>
             <ULink :to="preset.keyHelpUrl" target="_blank" class="text-xs inline-flex items-center gap-1">
               Find your {{ preset.name }} stream key <UIcon name="i-lucide-arrow-up-right" class="size-3" />

@@ -41,12 +41,14 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
 <template>
   <UDashboardPanel id="chat" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
     <template #header>
-      <UDashboardNavbar title="Chat" :ui="{ root: 'h-12' }">
+      <UDashboardNavbar title="Chat" :ui="{ root: 'h-14' }">
         <template #trailing>
-          <span class="flex items-center gap-1.5 text-xs text-dimmed">
-            <StatusDot :color="connected ? 'bg-success' : 'bg-(--ui-text-dimmed)'" />
-            {{ connected ? `${configured.length} source${configured.length === 1 ? '' : 's'}` : 'Connecting…' }}
-          </span>
+          <UiStatus
+            :tone="connected ? 'live' : 'info'"
+            :pulse="!connected"
+            :label="connected ? `${configured.length} source${configured.length === 1 ? '' : 's'}` : 'Connecting…'"
+            class="text-muted"
+          />
         </template>
         <template #right>
           <UButton class="lg:hidden" label="Sources" icon="i-lucide-sliders-horizontal" variant="outline" color="neutral" @click="sourcesOpen = true" />
@@ -55,7 +57,7 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
       <UDashboardToolbar>
         <UTabs v-model="filter" :items="tabs" :content="false" size="xs" variant="link" class="-mb-px">
           <template #trailing="{ item }">
-            <span class="ml-1 font-mono text-[10px] text-dimmed">{{ counts[item.value as string] ?? 0 }}</span>
+            <span class="ml-1 font-mono text-2xs text-dimmed">{{ counts[item.value as string] ?? 0 }}</span>
           </template>
         </UTabs>
       </UDashboardToolbar>
@@ -74,18 +76,18 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
             class="h-full"
           />
           <ul v-else class="space-y-0.5">
-            <li v-for="m in shown" :key="m.id" class="group flex gap-2 rounded-md px-2 py-1 hover:bg-elevated/50 text-sm leading-relaxed">
-              <UIcon :name="platformIcon[m.platform]" class="mt-1 size-3.5 shrink-0" :style="{ color: platformColor[m.platform] }" />
+            <li v-for="m in shown" :key="m.id" class="group flex gap-2 rounded-md px-2 py-1 text-base hover:bg-elevated/50">
+              <UiPlatformIcon :platform="m.platform" size="sm" class="mt-1" />
               <p class="min-w-0 flex-1 break-words">
                 <span class="font-semibold" :style="m.author.color ? { color: m.author.color } : undefined">{{ m.author.name }}</span>
-                <span v-if="m.amount" class="ml-1.5 rounded bg-warning/15 px-1.5 py-0.5 text-[11px] font-medium text-warning">{{ m.amount }}</span>
+                <span v-if="m.amount" class="ml-1.5 rounded bg-warning/15 px-1.5 py-0.5 text-2xs font-medium text-warning">{{ m.amount }}</span>
                 <span class="text-dimmed">: </span>
                 <template v-for="(p, i) in m.parts" :key="i">
                   <img v-if="p.t === 'emote'" :src="p.url" :alt="p.name" :title="p.name" class="inline h-6 align-middle" loading="lazy">
                   <span v-else class="text-default">{{ p.v }}</span>
                 </template>
               </p>
-              <span class="mt-0.5 shrink-0 font-mono text-[10px] text-dimmed opacity-0 group-hover:opacity-100">{{ time(m.ts) }}</span>
+              <span class="mt-0.5 shrink-0 font-mono text-2xs text-dimmed opacity-0 group-hover:opacity-100">{{ time(m.ts) }}</span>
             </li>
           </ul>
         </div>
@@ -104,14 +106,13 @@ const time = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digi
   <!-- Sources: side panel on desktop, slideover on mobile -->
   <UDashboardPanel id="chat-sources" :default-size="20" :min-size="18" :max-size="26" resizable class="hidden lg:flex" :ui="{ body: 'gap-6' }">
     <template #header>
-      <UDashboardNavbar title="Sources" :toggle="false" :ui="{ root: 'h-12' }" />
+      <UDashboardNavbar title="Sources" :toggle="false" :ui="{ root: 'h-14' }" />
     </template>
     <template #body>
       <ChatSourcesForm :sources="sources" />
-      <div class="space-y-2">
-        <p class="section-label">Show in OBS</p>
-        <p class="text-xs text-muted">Install the Multichat plugin and paste your plugin token from <ULink to="/setup" class="text-highlighted underline">Setup</ULink>.</p>
-      </div>
+      <UiCallout tone="info" icon="i-lucide-puzzle" title="Show chat in OBS" description="Install the Multichat plugin and sign in. Chat appears in a dock and as a scene source.">
+        <UButton label="Set up the plugin" to="/setup" variant="link" color="neutral" size="xs" class="mt-1 px-0" trailing-icon="i-lucide-arrow-right" />
+      </UiCallout>
     </template>
   </UDashboardPanel>
 

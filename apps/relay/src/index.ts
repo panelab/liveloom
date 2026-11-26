@@ -10,6 +10,7 @@ await runMigrations(config.databaseUrl, config.databaseAuthToken)
 const db = createDb({ url: config.databaseUrl, authToken: config.databaseAuthToken })
 const supervisor = new Supervisor(db)
 const chat = new ChatHub(db)
+supervisor.onHealth = (channelId, live, issues) => chat.publishHealth(channelId, live, issues)
 
 /** Body MediaMTX POSTs to authHTTPAddress. */
 interface AuthRequest {

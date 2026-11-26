@@ -56,6 +56,8 @@ void ChatClient::configure(const std::string &server, const std::string &token)
 		token_ = token;
 		messages_.clear();
 		sources_.clear();
+		health_.clear();
+		live_ = false;
 	}
 	gen_++;
 	rev_++;
@@ -84,6 +86,18 @@ std::vector<SourceStatus> ChatClient::sources() const
 {
 	std::lock_guard lock(mtx_);
 	return sources_;
+}
+
+std::vector<HealthIssue> ChatClient::healthIssues() const
+{
+	std::lock_guard lock(mtx_);
+	return health_;
+}
+
+bool ChatClient::streamLive() const
+{
+	std::lock_guard lock(mtx_);
+	return live_;
 }
 
 ConnState ChatClient::state() const
@@ -148,7 +162,19 @@ void ChatClient::run()
 		}
 		failures = gotData ? 1 : failures + 1;
 		const int delay = std::min(30'000, 1000 * (1 << std::min(failures, 5)));
-		setState(ConnState::Error, (error.empty() ? std::string("Disconnected") : error) + " · retrying");
+		// Plain-language reason; technical detail goes to the OBS log.
+		std::string reason;
+		if (code >= 500)
+			reason = "LiveLoom is temporarily unavailable";
+		else if (code == 404)
+			reason = "This server doesn't have LiveLoom chat";
+		else if (code >= 400)
+			reason = "LiveLoom refused the connection";
+		else if (gotData)
+			reason = "Connection lost";
+		else
+			reason = "Can't reach LiveLoom";
+		setState(ConnState::Error, reason + " · retrying in " + std::to_string(delay / 1000) + "s");
 		obs_log(LOG_WARNING, "chat stream ended (%s), retry in %d ms", error.c_str(), delay);
 		waitFor(delay, gen);
 	}
@@ -338,6 +364,16 @@ void ChatClient::dispatch(const std::string &event, const std::string &data)
 		}
 	} else if (type == "status") {
 		sources_ = parseSources(root);
+	} else if (type == "health") {
+		live_ = obs_data_get_bool(root, "live");
+		health_.clear();
+		obs_data_array_t *arr = obs_data_get_array(root, "issues");
+		for (size_t i = 0, n = arr ? obs_data_array_count(arr) : 0; i < n; i++) {
+			obs_data_t *it = obs_data_array_item(arr, i);
+			health_.push_back({str(it, "level"), str(it, "title"), str(it, "fix")});
+			obs_data_release(it);
+		}
+		obs_data_array_release(arr);
 	}
 	while (messages_.size() > MAX_MESSAGES)
 		messages_.pop_front();
