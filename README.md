@@ -1,6 +1,6 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# streaming-platform
+# LiveLoom
 
 Stream once from OBS and go live on YouTube, Twitch, Kick, Facebook, TikTok, X and any other RTMP platform at the same time.
 

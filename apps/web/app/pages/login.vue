@@ -26,7 +26,7 @@ async function submit() {
       <div class="flex flex-col items-center gap-3 text-center">
         <img src="/icon.svg" alt="" class="size-12">
         <div>
-          <h1 class="text-xl font-semibold">Streaming Platform</h1>
+          <h1 class="text-xl font-semibold">LiveLoom</h1>
           <p class="text-sm text-muted">Go live everywhere from one stream.</p>
         </div>
       </div>

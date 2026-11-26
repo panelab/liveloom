@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   devtools: { enabled: true },
   app: {
-    head: { title: 'Streaming Platform', link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }] },
+    head: { title: 'LiveLoom', link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }] },
   },
   runtimeConfig: {
     // Server-only. Override at runtime with NUXT_DATABASE_URL etc., or the

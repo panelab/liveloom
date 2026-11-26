@@ -6,7 +6,7 @@
 // 5. bun run deploy:cf   (Nitro fills in main/assets at build time)
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "streaming-platform-web",
+  "name": "liveloom-web",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {

@@ -54,7 +54,7 @@ async function logout() {
       <div class="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <img src="/icon.svg" alt="" class="size-7">
-          <span class="font-semibold">Streaming Platform</span>
+          <span class="font-semibold">LiveLoom</span>
         </div>
         <div class="flex items-center gap-2">
           <UColorModeButton />
